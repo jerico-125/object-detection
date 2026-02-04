@@ -81,7 +81,7 @@ def anonymize_images(config: Dict[str, Any], from_previous_step: bool = False) -
 
     # Determine input directory
     if from_previous_step:
-        # Prefer labeling_input_dir (set by yolo_autolabel) over kept_images_dir
+        # Prefer labeling_input_dir (set by autolabel) over kept_images_dir
         if config.get("labeling_input_dir") and os.path.exists(config["labeling_input_dir"]):
             input_dir = config["labeling_input_dir"]
         else:

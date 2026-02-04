@@ -900,11 +900,6 @@ def cluster_image_directory(
     saved_count = 0
     moved_count = 0
 
-    # TODO: TEMPORARY TIMING - Remove after identifying bottleneck
-    timing_parallel = 0.0  # Parallel image processing (load + blur + hist)
-    timing_cluster = 0.0   # clustering algorithm
-    timing_copy = 0.0      # shutil.copy2 - file copying
-
     # Determine number of worker processes
     n_workers = min(cpu_count(), 8)  # Cap at 8 to avoid too much overhead
     print(f"Using {n_workers} parallel workers for image processing")
@@ -922,7 +917,6 @@ def cluster_image_directory(
         # Convert paths to strings for multiprocessing
         img_paths_str = [str(p) for p in folder_files]
 
-        t0 = time.time()
         with Pool(processes=n_workers, initializer=_init_worker, initargs=(blur_threshold, bins)) as pool:
             # Process images in parallel with progress bar
             results = list(tqdm(
@@ -931,7 +925,6 @@ def cluster_image_directory(
                 desc="Analyzing images",
                 unit="img"
             ))
-        timing_parallel += time.time() - t0
 
         # Collect results
         for img_path_str, blur_score, hist, is_blurry in results:
@@ -954,12 +947,10 @@ def cluster_image_directory(
             continue
 
         if len(candidate_files) == 1:
-            t0 = time.time()
             rel = candidate_files[0].relative_to(input_path) if candidate_files[0].is_relative_to(input_path) else Path(candidate_files[0].name)
             dest = output_path / rel
             dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(str(candidate_files[0]), str(dest))
-            timing_copy += time.time() - t0
             saved_count += 1
             continue
 
@@ -967,7 +958,6 @@ def cluster_image_directory(
         histograms_array = np.array(candidate_histograms)
         sharpness_array = np.array(candidate_sharpness)
 
-        t0 = time.time()
         if clustering_method == "sequential":
             labels = cluster_sequential_frames(
                 histograms=histograms_array,
@@ -975,7 +965,6 @@ def cluster_image_directory(
                 window_size=window_size
             )
             n_clusters = len(set(labels))
-            timing_cluster += time.time() - t0
             print(f"  Clustering: {n_clusters} clusters (sequential)")
         else:
             labels = cluster_frames_dbscan(
@@ -985,7 +974,6 @@ def cluster_image_directory(
             )
             n_clusters = len(set(labels) - {-1})
             n_noise = int(np.sum(labels == -1))
-            timing_cluster += time.time() - t0
             print(f"  Clustering: {n_clusters} clusters, {n_noise} noise/singleton points")
 
         # Determine representative indices
@@ -1002,7 +990,6 @@ def cluster_image_directory(
             representative_indices.add(int(best_idx))
 
         # Copy only representatives to output - skip non-representatives entirely
-        t0 = time.time()
         for i, img_path in enumerate(candidate_files):
             if i in representative_indices:
                 rel = img_path.relative_to(input_path) if img_path.is_relative_to(input_path) else Path(img_path.name)
@@ -1012,20 +999,10 @@ def cluster_image_directory(
                 saved_count += 1
             else:
                 moved_count += 1  # Count as "skipped" but don't actually copy
-        timing_copy += time.time() - t0
 
     total_time = time.time() - start_time
 
-    # TODO: TEMPORARY TIMING OUTPUT - Remove after identifying bottleneck
-    print("\n" + "-" * 50)
-    print(f"TIMING BREAKDOWN (temporary) - {n_workers} workers:")
-    print(f"  Parallel processing (load+blur+hist): {timing_parallel:.2f}s ({timing_parallel/total_time*100:.1f}%)")
-    print(f"  Clustering algorithm:                 {timing_cluster:.2f}s ({timing_cluster/total_time*100:.1f}%)")
-    print(f"  File copying (shutil.copy2):          {timing_copy:.2f}s ({timing_copy/total_time*100:.1f}%)")
-    print(f"  Other overhead:                       {total_time - timing_parallel - timing_cluster - timing_copy:.2f}s")
-    print("-" * 50)
-
-    print(f"Completed!")
+    print(f"\nCompleted!")
     print(f"Folders processed: {n_folders}")
     print(f"Processed: {total_processed} images")
     print(f"Blurry (moved to deleted): {total_blurry}")

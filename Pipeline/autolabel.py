@@ -164,33 +164,7 @@ def run_yolo_inference(
     """
     from ultralytics import YOLO
 
-    # TODO: TEMPORARY - GPU detection/verification code for debugging
-    try:
-        import torch
-        cuda_available = torch.cuda.is_available()
-        if cuda_available:
-            gpu_name = torch.cuda.get_device_name(0)
-            gpu_memory = torch.cuda.get_device_properties(0).total_memory / 1024**3
-            print(f"\n{GREEN}GPU detected: {gpu_name} ({gpu_memory:.1f} GB){RESET}")
-        else:
-            print(f"\n{RED}WARNING: CUDA not available - running on CPU{RESET}")
-            print(f"{RED}This will be significantly slower than GPU inference{RESET}")
-    except ImportError:
-        print(f"\n{RED}WARNING: PyTorch not available - cannot check GPU status{RESET}")
-
     model = YOLO(model_path)
-
-    # TODO: TEMPORARY - Print actual device being used by the model
-    try:
-        import torch
-        model_device = next(model.model.parameters()).device
-        print(f"Model loaded on device: {model_device}")
-        if str(model_device).startswith('cuda'):
-            print(f"{GREEN}✓ Using GPU for inference{RESET}\n")
-        else:
-            print(f"{RED}✗ Using CPU for inference{RESET}\n")
-    except:
-        pass
     input_path = Path(input_dir)
 
     image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.webp'}

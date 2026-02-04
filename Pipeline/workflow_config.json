@@ -53,7 +53,7 @@
             "review_output_dir": "Directory where saved review screenshots are stored"
         },
 
-        "YOLO Auto-Labeling (yolo_labeling_workflow.py)": {
+        "YOLO Training Workflow (yolo_training_workflow.py)": {
             "yolo_model_path": "Path to trained YOLO model weights (.pt or .onnx)",
             "autolabel_input_dir": "Directory containing images to auto-label (typically extracted_frames)",
             "autolabel_confidence": "Confidence threshold for detections (0.0-1.0). Lower = more detections",
@@ -64,6 +64,25 @@
             "autolabel_deleted_dir": "Directory where unlabeled images are moved. Default: ./deleted/unlabeled",
             "yolo_train_ratio": "Train/val split ratio for YOLO conversion (0.0-1.0). Default: 0.8",
             "yolo_classes_file": "Path to classes.txt for YOLO conversion. null = auto-detect from JSON labels"
+        },
+
+        "YOLO Training (yolo_training_workflow.py Step 6)": {
+            "train_model": "Model to use: yolov8n/s/m/l/x.pt or path to custom weights. Default: yolov8n.pt",
+            "train_epochs": "Number of training epochs. Default: 100",
+            "train_batch": "Batch size (-1 for auto-batch). Default: 16",
+            "train_imgsz": "Input image size (e.g., 640, 1280). Default: 640",
+            "train_device": "CUDA device (e.g., '0', '0,1', 'cpu'). Empty string = auto. Default: empty",
+            "train_workers": "Number of dataloader workers. Default: 8",
+            "train_project": "Project directory for saving training results. Default: ./runs",
+            "train_name": "Experiment name. null = auto-generated timestamp. Default: null",
+            "train_resume": "Resume training from last checkpoint. Default: false",
+            "train_pretrained": "Use pretrained weights. Default: true",
+            "train_optimizer": "Optimizer: auto, SGD, Adam, AdamW. Default: auto",
+            "train_lr0": "Initial learning rate. Default: 0.01",
+            "train_patience": "Early stopping patience (epochs). 0 = disabled. Default: 50",
+            "train_cache": "Cache images in RAM for faster training. Default: false",
+            "train_amp": "Use Automatic Mixed Precision (AMP). Default: true",
+            "train_augment": "Enable data augmentation. Default: true"
         }
     },
 
@@ -115,5 +134,22 @@
     "autolabel_delete_unlabeled": true,
     "autolabel_deleted_dir": "./deleted/unlabeled",
     "yolo_train_ratio": 0.8,
-    "yolo_classes_file": null
+    "yolo_classes_file": null,
+
+    "train_model": "yolov8n.pt",
+    "train_epochs": 100,
+    "train_batch": 16,
+    "train_imgsz": 640,
+    "train_device": "",
+    "train_workers": 8,
+    "train_project": "./runs",
+    "train_name": null,
+    "train_resume": false,
+    "train_pretrained": true,
+    "train_optimizer": "auto",
+    "train_lr0": 0.01,
+    "train_patience": 50,
+    "train_cache": false,
+    "train_amp": true,
+    "train_augment": true
 }

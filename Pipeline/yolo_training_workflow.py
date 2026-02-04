@@ -1,24 +1,25 @@
 #!/usr/bin/env python3
 """
-YOLO Auto-Labeling Workflow
+YOLO Training Workflow
 
 Alternative pipeline that uses a trained YOLO model to auto-label extracted
 frames, deletes images without detections, then lets you review/correct
-labels in X-AnyLabeling before consolidating the dataset.
+labels in X-AnyLabeling before consolidating the dataset and training a model.
 
 Steps:
 1. Extract image frames from video
 2. YOLO auto-label (delete images with no detections)
 3. Anonymize faces and license plates
-4. Consolidate files
-5. Review/correct labels (X-AnyLabeling)
-6. Consolidate files (final)
+4. Review/correct labels (X-AnyLabeling)
+5. Consolidate dataset
+6. Convert to YOLO format
+7. Train YOLO model
 
 Usage:
-    python yolo_labeling_workflow.py
-    python yolo_labeling_workflow.py --start-step 2
-    python yolo_labeling_workflow.py --config yolo_workflow_config.json
-    python yolo_labeling_workflow.py --video /path/to/video.mp4 --model /path/to/best.pt
+    python yolo_training_workflow.py
+    python yolo_training_workflow.py --start-step 2
+    python yolo_training_workflow.py --config yolo_workflow_config.json
+    python yolo_training_workflow.py --video /path/to/video.mp4 --model /path/to/best.pt
 """
 
 import os
@@ -34,20 +35,28 @@ from typing import Optional, Dict, Any
 # ANSI color codes
 GREEN = "\033[92m"
 RED = "\033[91m"
+YELLOW = "\033[93m"
 RESET = "\033[0m"
 
 # Import step modules
 from extract_frames import extract_video_frames
-from yolo_autolabel import yolo_autolabel
+from autolabel import yolo_autolabel
 from anonymize import anonymize_images
 from labeling import run_labeling
 from consolidate import consolidate_files
 
-# Add YOLO_Training to path for convert_json_to_yolo import
-_yolo_training_dir = str(Path(__file__).parent.parent / "YOLO_Training")
-if _yolo_training_dir not in sys.path:
-    sys.path.insert(0, _yolo_training_dir)
-from convert_json_to_yolo import convert_dataset
+# Import YOLO training utilities
+YOLO_TRAINING_DIR = Path(__file__).parent.parent / "YOLO_Training"
+sys.path.insert(0, str(YOLO_TRAINING_DIR))
+
+try:
+    from convert_json_to_yolo import convert_dataset
+    from train_yolo import train_yolo
+except ImportError as e:
+    print(f"{RED}Warning: Could not import YOLO training modules: {e}{RESET}")
+    print(f"{RED}Make sure YOLO_Training directory contains convert_json_to_yolo.py and train_yolo.py{RESET}")
+    convert_dataset = None
+    train_yolo = None
 
 
 # ============================================================================
@@ -99,9 +108,27 @@ DEFAULT_CONFIG = {
     "anylabeling_venv": "x-anylabeling_env",
     "anylabeling_repo": "~/AI_Hub/X-AnyLabeling",
 
-    # Step 6 (final consolidation) -> YOLO conversion
+    # Step 5 (final consolidation) -> YOLO conversion
     "yolo_train_ratio": 0.8,
     "yolo_classes_file": None,
+
+    # Step 6: Train YOLO model
+    "train_model": "yolov8n.pt",
+    "train_epochs": 100,
+    "train_batch": 16,
+    "train_imgsz": 640,
+    "train_device": "",
+    "train_workers": 8,
+    "train_project": "./runs",
+    "train_name": None,
+    "train_resume": False,
+    "train_pretrained": True,
+    "train_optimizer": "auto",
+    "train_lr0": 0.01,
+    "train_patience": 50,
+    "train_cache": False,
+    "train_amp": True,
+    "train_augment": True,
 }
 
 
@@ -113,7 +140,7 @@ def print_banner():
     """Print the workflow banner."""
     print()
     print("=" * 70)
-    print("            YOLO AUTO-LABELING WORKFLOW")
+    print("            YOLO TRAINING WORKFLOW")
     print("=" * 70)
     print()
 
@@ -125,9 +152,9 @@ def print_step_menu():
     print("  1. Extract image frames from video")
     print("  2. YOLO auto-label (remove unlabeled images)")
     print("  3. Anonymize faces and license plates")
-    print("  4. Consolidate files")
-    print("  5. Review/correct labels (X-AnyLabeling)")
-    print("  6. Consolidate files (final)")
+    print("  4. Review/correct labels (X-AnyLabeling)")
+    print("  5. Consolidate & convert to YOLO format")
+    print("  6. Train YOLO model")
     print()
     print("  0. Exit")
     print()
@@ -148,72 +175,118 @@ def get_step_choice() -> int:
             print("Please enter a valid number.")
 
 
-def consolidate_together(config, **kwargs):
-    """Step 4: Consolidate with images and labels in the same folder."""
-    config["separate_folders"] = False
-    result = consolidate_files(config, **kwargs)
-    # Set labeling_input_dir so X-AnyLabeling step knows where to find files
-    if result and config.get("consolidated_output_dir"):
-        config["labeling_input_dir"] = config["consolidated_output_dir"]
-    return result
-
-
-def consolidate_separated(config, **kwargs):
-    """Step 6: Consolidate with images and labels in separate folders, then convert to YOLO format."""
+def consolidate_and_convert(config, **kwargs):
+    """Step 5: Consolidate with images and labels in separate folders, then convert to YOLO format."""
     config["separate_folders"] = True
     config["label_format"] = config.get("label_format", "json")
     config["skip_format_prompt"] = True
     config["convert_to_yolo"] = True
-    result = consolidate_files(config, **kwargs)
 
-    if not result:
-        return False
-
-    # Convert consolidated JSON labels to YOLO txt format in the same output directory
-    # consolidate_files stores the actual output dir chosen by the user in review_input_dir
-    consolidated_dir = config.get("review_input_dir", config.get("consolidated_output_dir", "./Dataset"))
-    train_ratio = config.get("yolo_train_ratio", 0.8)
-    classes_file = config.get("yolo_classes_file")
-    # Remove stale YOLO output from previous runs so convert_dataset starts fresh
+    # Remove stale YOLO output from previous runs
+    consolidated_dir = config.get("consolidated_output_dir", "./Dataset")
     consolidated_path = Path(consolidated_dir)
     for stale_name in ("images", "labels", "classes.txt", "dataset.yaml"):
         stale_path = consolidated_path / stale_name
         if stale_path.is_dir():
             shutil.rmtree(stale_path)
-        elif stale_path.is_file() and not (stale_name == "classes.txt" and classes_file):
+        elif stale_path.is_file():
             stale_path.unlink()
 
     print()
     print("#" * 70)
-    print("# CONVERTING JSON LABELS TO YOLO FORMAT")
+    print("# CONSOLIDATING & CONVERTING TO YOLO FORMAT")
     print("#" * 70)
-    print(f"\nInput/output directory: {consolidated_dir}")
-    print(f"Train/val split:       {train_ratio}/{round(1 - train_ratio, 2)}")
 
-    try:
-        yaml_path = convert_dataset(
-            input_dir=consolidated_dir,
-            output_dir=consolidated_dir,
-            train_ratio=train_ratio,
-            classes_file=classes_file,
-        )
-        if yaml_path:
-            # Remove intermediate Image/ and Label/ folders — YOLO images/ and labels/ are the final output
-            consolidated_path = Path(consolidated_dir)
-            for folder_name in ("Image", "Label"):
-                folder = consolidated_path / folder_name
-                if folder.exists() and folder.is_dir():
-                    shutil.rmtree(folder)
-                    print(f"Removed intermediate folder: {folder}")
+    result = consolidate_files(config, **kwargs)
 
-            print(f"\nYOLO dataset ready for training.")
-            print(f"Use with: python train_yolo.py --data {yaml_path}")
-            config["yolo_dataset_yaml"] = yaml_path
-    except Exception as e:
-        print(f"{RED}Error during YOLO conversion: {e}{RESET}")
+    if result:
+        # Store YAML path for summary
+        yaml_path = consolidated_path / "dataset.yaml"
+        if yaml_path.exists():
+            config["yolo_dataset_yaml"] = str(yaml_path)
+
+    return result
+
+
+def train_yolo_model(config, **kwargs):
+    """Step 6: Train YOLO model using the converted dataset."""
+    if train_yolo is None:
+        print(f"{RED}Error: YOLO training module not available.{RESET}")
+        print(f"{RED}Make sure train_yolo.py is in the YOLO_Training directory.{RESET}")
         return False
 
-    return True
+    print()
+    print("#" * 70)
+    print("# TRAINING YOLO MODEL")
+    print("#" * 70)
+
+    # Get dataset.yaml path
+    yaml_path = config.get("yolo_dataset_yaml")
+    if not yaml_path:
+        # Try to find it in the consolidated directory
+        consolidated_dir = config.get("consolidated_output_dir", "./Dataset")
+        yaml_path = Path(consolidated_dir) / "dataset.yaml"
+        if not yaml_path.exists():
+            print(f"{RED}Error: dataset.yaml not found. Run step 5 first.{RESET}")
+            return False
+        yaml_path = str(yaml_path)
+
+    if not Path(yaml_path).exists():
+        print(f"{RED}Error: dataset.yaml not found at {yaml_path}{RESET}")
+        print(f"{RED}Run step 5 (Consolidate & convert to YOLO format) first.{RESET}")
+        return False
+
+    print(f"Using dataset config: {yaml_path}")
+    print()
+
+    # Extract training parameters from config
+    train_params = {
+        "data": yaml_path,
+        "model": config.get("train_model", "yolov8n.pt"),
+        "epochs": config.get("train_epochs", 100),
+        "batch": config.get("train_batch", 16),
+        "imgsz": config.get("train_imgsz", 640),
+        "device": config.get("train_device", ""),
+        "workers": config.get("train_workers", 8),
+        "project": config.get("train_project", "./runs"),
+        "name": config.get("train_name"),
+        "resume": config.get("train_resume", False),
+        "pretrained": config.get("train_pretrained", True),
+        "optimizer": config.get("train_optimizer", "auto"),
+        "lr0": config.get("train_lr0", 0.01),
+        "patience": config.get("train_patience", 50),
+        "cache": config.get("train_cache", False),
+        "amp": config.get("train_amp", True),
+        "augment": config.get("train_augment", True),
+    }
+
+    # Show prompt before training
+    print(f"{YELLOW}Training configuration:{RESET}")
+    print(f"  Model:      {train_params['model']}")
+    print(f"  Epochs:     {train_params['epochs']}")
+    print(f"  Batch size: {train_params['batch']}")
+    print(f"  Image size: {train_params['imgsz']}")
+    print(f"  Device:     {train_params['device'] if train_params['device'] else 'auto'}")
+    print()
+
+    try:
+        results = train_yolo(**train_params)
+
+        if results:
+            # Store training results path
+            config["training_results_dir"] = str(results.save_dir)
+            print(f"\n{GREEN}Training completed successfully!{RESET}")
+            print(f"Results saved to: {results.save_dir}")
+            return True
+        else:
+            print(f"\n{RED}Training failed.{RESET}")
+            return False
+
+    except Exception as e:
+        print(f"\n{RED}Error during training: {e}{RESET}")
+        import traceback
+        traceback.print_exc()
+        return False
 
 
 def print_progress(steps, current_step, start_step, status="running"):
@@ -263,9 +336,9 @@ def _get_step_output_dir(step_num, config):
         1: "extracted_frames_dir",
         2: "autolabel_input_dir",
         3: "anonymize_output_dir",
-        4: "consolidated_output_dir",
-        5: "labeling_input_dir",
-        6: "consolidated_output_dir",
+        4: "labeling_input_dir",
+        5: "consolidated_output_dir",
+        6: "training_results_dir",
     }
     key = mapping.get(step_num, "")
     return config.get(key, "")
@@ -301,9 +374,9 @@ def run_workflow(start_step: int, config: Dict[str, Any]) -> bool:
         (1, "Extracting image frames from video", extract_video_frames),
         (2, "YOLO auto-labeling", yolo_autolabel),
         (3, "Anonymizing faces and license plates", anonymize_images),
-        (4, "Consolidating files", consolidate_together),
-        (5, "Reviewing/correcting labels (X-AnyLabeling)", run_labeling),
-        (6, "Consolidating files (final)", consolidate_separated),
+        (4, "Reviewing/correcting labels (X-AnyLabeling)", run_labeling),
+        (5, "Consolidating & converting to YOLO format", consolidate_and_convert),
+        (6, "Training YOLO model", train_yolo_model),
     ]
 
     from_previous_step = False
@@ -413,32 +486,32 @@ def find_default_config() -> Optional[str]:
 
 def main():
     parser = argparse.ArgumentParser(
-        description='YOLO Auto-Labeling Workflow - Extract frames, auto-label with YOLO, review, consolidate',
+        description='YOLO Training Workflow - Extract frames, auto-label with YOLO, review, consolidate, and train model',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
   # Run interactively
-  python yolo_labeling_workflow.py
+  python yolo_training_workflow.py
 
   # Start from a specific step
-  python yolo_labeling_workflow.py --start-step 2
+  python yolo_training_workflow.py --start-step 2
 
   # Use a specific configuration file
-  python yolo_labeling_workflow.py --config yolo_workflow_config.json
+  python yolo_training_workflow.py --config yolo_workflow_config.json
 
   # Specify video and model
-  python yolo_labeling_workflow.py --video /path/to/video.mp4 --model /path/to/best.pt
+  python yolo_training_workflow.py --video /path/to/video.mp4 --model /path/to/best.pt
 
   # Generate a template configuration file
-  python yolo_labeling_workflow.py --generate-config
+  python yolo_training_workflow.py --generate-config
 
 Steps:
   1. Extract image frames from video using ffmpeg
   2. Run YOLO model to auto-label frames (delete images with no detections)
   3. Anonymize faces and license plates
-  4. Consolidate files into dataset
-  5. Review/correct labels in X-AnyLabeling
-  6. Consolidate files (final)
+  4. Review/correct labels in X-AnyLabeling
+  5. Consolidate & convert to YOLO format
+  6. Train YOLO model
         """
     )
 

@@ -560,8 +560,298 @@ def consolidate_files(config: Dict[str, Any], from_previous_step: bool = False) 
         config["label_format"] = label_format
         config["consolidate_input_dirs"] = input_dirs  # For YOLO class file lookup
 
+        # Check if YOLO conversion is requested
+        if config.get("convert_to_yolo"):
+            yolo_success = _convert_to_yolo_format(
+                output_dir=output_dir,
+                train_ratio=config.get("yolo_train_ratio", 0.8),
+                classes_file=config.get("yolo_classes_file")
+            )
+            if not yolo_success:
+                return False
+
     except Exception as e:
         print(f"{RED}Error during consolidation: {e}{RESET}")
         return False
+
+    return True
+
+
+# ============================================================================
+# YOLO FORMAT CONVERSION
+# ============================================================================
+
+def _extract_annotations_from_json(data: dict) -> list:
+    """Extract annotation list from LabelMe/X-AnyLabeling JSON format."""
+    boxes = []
+    if 'shapes' not in data:
+        return boxes
+
+    img_width = data.get('imageWidth', 0)
+    img_height = data.get('imageHeight', 0)
+
+    for shape in data['shapes']:
+        if shape.get('shape_type') == 'rectangle':
+            points = shape['points']
+
+            if len(points) == 2:
+                # 2-point format: [top-left, bottom-right]
+                x1, y1 = points[0]
+                x2, y2 = points[1]
+            elif len(points) == 4:
+                # 4-point format: [top-left, top-right, bottom-right, bottom-left]
+                x_coords = [p[0] for p in points]
+                y_coords = [p[1] for p in points]
+                x1, x2 = min(x_coords), max(x_coords)
+                y1, y2 = min(y_coords), max(y_coords)
+            else:
+                continue
+
+            boxes.append({
+                'box': {'x': min(x1, x2), 'y': min(y1, y2),
+                        'w': abs(x2 - x1), 'h': abs(y2 - y1)},
+                'category_name': shape.get('label', 'unknown'),
+                'img_width': img_width,
+                'img_height': img_height
+            })
+    return boxes
+
+
+def _convert_box_to_yolo(box: dict, img_width: int, img_height: int) -> tuple:
+    """Convert box coordinates to YOLO format (normalized x_center, y_center, width, height)."""
+    x = box.get('x', 0)
+    y = box.get('y', 0)
+    w = box.get('w', box.get('width', 0))
+    h = box.get('h', box.get('height', 0))
+
+    # Calculate center coordinates
+    x_center = (x + w / 2) / img_width
+    y_center = (y + h / 2) / img_height
+
+    # Normalize width and height
+    norm_width = w / img_width
+    norm_height = h / img_height
+
+    # Clamp values to [0, 1]
+    x_center = max(0, min(1, x_center))
+    y_center = max(0, min(1, y_center))
+    norm_width = max(0, min(1, norm_width))
+    norm_height = max(0, min(1, norm_height))
+
+    return x_center, y_center, norm_width, norm_height
+
+
+def _build_class_mapping(label_dir: Path) -> tuple:
+    """
+    Build class mapping from JSON labels.
+    Returns: (class_to_id dict, class_names list)
+    """
+    print("Scanning JSON files to extract class names...")
+    class_names_set = set()
+
+    for json_file in label_dir.glob('*.json'):
+        try:
+            with open(json_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+
+            annotations = _extract_annotations_from_json(data)
+            for ann in annotations:
+                if 'category_name' in ann:
+                    class_names_set.add(ann['category_name'])
+        except Exception as e:
+            print(f"{RED}Warning: Could not parse {json_file}: {e}{RESET}")
+
+    class_names = sorted(list(class_names_set))
+    class_to_id = {name: idx for idx, name in enumerate(class_names)}
+
+    return class_to_id, class_names
+
+
+def _process_json_to_yolo(json_file: Path, image_dir: Path, output_label_dir: Path,
+                          class_to_id: dict, output_image_dir: Path) -> int:
+    """Process a JSON file and convert to YOLO format."""
+    try:
+        with open(json_file, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+    except Exception as e:
+        print(f"{RED}Warning: Could not read {json_file}: {e}{RESET}")
+        return 0
+
+    # Get image name
+    image_name = data.get('imagePath', json_file.stem)
+    image_stem = Path(image_name).stem
+
+    # Find corresponding image
+    image_path = None
+    for ext in ['.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.webp', '.PNG', '.JPG', '.JPEG']:
+        candidate = image_dir / f"{image_stem}{ext}"
+        if candidate.exists():
+            image_path = candidate
+            break
+
+    if not image_path:
+        print(f"{RED}Warning: No image found for {json_file}{RESET}")
+        return 0
+
+    # Get image dimensions
+    img_width = data.get('imageWidth', 0)
+    img_height = data.get('imageHeight', 0)
+
+    if img_width == 0 or img_height == 0:
+        from PIL import Image
+        with Image.open(image_path) as img:
+            img_width, img_height = img.size
+
+    # Extract annotations
+    annotations = _extract_annotations_from_json(data)
+
+    if not annotations:
+        return 0
+
+    # Write YOLO format labels
+    output_label_path = output_label_dir / f"{image_path.stem}.txt"
+
+    lines = []
+    for ann in annotations:
+        box = ann.get('box', ann)
+        category = ann.get('category_name', 'unknown')
+
+        if category not in class_to_id:
+            print(f"{RED}Warning: Unknown class '{category}' in {json_file}{RESET}")
+            continue
+
+        class_id = class_to_id[category]
+
+        try:
+            x_center, y_center, w, h = _convert_box_to_yolo(box, img_width, img_height)
+            if w > 0 and h > 0:
+                lines.append(f"{class_id} {x_center:.6f} {y_center:.6f} {w:.6f} {h:.6f}")
+        except Exception as e:
+            print(f"{RED}Warning: Could not convert box in {json_file}: {e}{RESET}")
+
+    if lines:
+        with open(output_label_path, 'w') as f:
+            f.write('\n'.join(lines))
+
+        # Copy image
+        shutil.copy2(image_path, output_image_dir / image_path.name)
+        return 1
+
+    return 0
+
+
+def _convert_to_yolo_format(output_dir: str, train_ratio: float = 0.8,
+                            classes_file: str = None) -> bool:
+    """
+    Convert consolidated dataset from JSON to YOLO format.
+
+    Args:
+        output_dir: Directory containing Image/ and Label/ folders
+        train_ratio: Ratio of training data (rest goes to validation)
+        classes_file: Optional path to classes.txt (not used currently)
+
+    Returns:
+        True if successful, False otherwise
+    """
+    output_path = Path(output_dir)
+
+    # Detect directory structure
+    image_dir = output_path / 'Image'
+    label_dir = output_path / 'Label'
+
+    if not image_dir.exists() or not label_dir.exists():
+        print(f"{RED}Error: Expected 'Image' and 'Label' folders in {output_dir}{RESET}")
+        return False
+
+    # Build class mapping
+    class_to_id, class_names = _build_class_mapping(label_dir)
+    print(f"\nDetected {len(class_names)} classes:")
+    for idx, name in enumerate(class_names):
+        print(f"  {idx}: {name}")
+
+    # Create output directories
+    train_images = output_path / 'images' / 'train'
+    train_labels = output_path / 'labels' / 'train'
+    val_images = output_path / 'images' / 'val'
+    val_labels = output_path / 'labels' / 'val'
+
+    for d in [train_images, train_labels, val_images, val_labels]:
+        d.mkdir(parents=True, exist_ok=True)
+
+    # Get all JSON files
+    json_files = list(label_dir.glob('*.json'))
+    print(f"\nFound {len(json_files)} JSON files")
+
+    if not json_files:
+        print(f"{RED}No JSON files found in {label_dir}{RESET}")
+        return False
+
+    # Split into train/val
+    import random
+    random.shuffle(json_files)
+    split_idx = int(len(json_files) * train_ratio)
+    train_jsons = json_files[:split_idx]
+    val_jsons = json_files[split_idx:]
+
+    print(f"Train: {len(train_jsons)} files, Val: {len(val_jsons)} files")
+
+    # Process training data
+    print("\nProcessing training data...")
+    train_count = 0
+    for json_file in train_jsons:
+        count = _process_json_to_yolo(json_file, image_dir, train_labels,
+                                      class_to_id, train_images)
+        train_count += count
+
+    # Process validation data
+    print("Processing validation data...")
+    val_count = 0
+    for json_file in val_jsons:
+        count = _process_json_to_yolo(json_file, image_dir, val_labels,
+                                      class_to_id, val_images)
+        val_count += count
+
+    print(f"\nConversion complete!")
+    print(f"  Training images: {train_count}")
+    print(f"  Validation images: {val_count}")
+
+    # Save class names
+    classes_output = output_path / 'classes.txt'
+    with open(classes_output, 'w') as f:
+        for name in class_names:
+            f.write(f"{name}\n")
+    print(f"  Classes saved to: {classes_output}")
+
+    # Generate YAML config
+    yaml_path = output_path / 'dataset.yaml'
+    yaml_content = f"""# YOLO Dataset Configuration
+# Auto-generated by consolidate.py
+
+path: {output_path.absolute()}
+train: images/train
+val: images/val
+
+# Number of classes
+nc: {len(class_names)}
+
+# Class names
+names:
+"""
+    for idx, name in enumerate(class_names):
+        yaml_content += f"  {idx}: {name}\n"
+
+    with open(yaml_path, 'w') as f:
+        f.write(yaml_content)
+    print(f"  Dataset YAML saved to: {yaml_path}")
+
+    # Remove intermediate Image/ and Label/ folders
+    print("\nRemoving intermediate Image/ and Label/ folders...")
+    shutil.rmtree(image_dir)
+    shutil.rmtree(label_dir)
+    print(f"  Removed: {image_dir}")
+    print(f"  Removed: {label_dir}")
+
+    print(f"\nYOLO dataset ready for training.")
+    print(f"Use with: python train_yolo.py --data {yaml_path}")
 
     return True
