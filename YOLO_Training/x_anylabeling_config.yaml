@@ -1,0 +1,15 @@
+type: yolov8
+name: aidall_yolov8n
+display_name: AidALL YOLOv8n
+model_path:
+input_width: 640
+input_height: 640
+score_threshold: 0.25
+confidence_threshold: 0.25
+nms_threshold: 0.45
+classes:
+  - crosswalk
+  - green traffic light
+  - red traffic light
+  - traffic sign
+  - warning

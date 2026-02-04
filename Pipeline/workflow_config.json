@@ -1,0 +1,119 @@
+{
+    "_documentation": {
+        "description": "Configuration file for the image labeling workflow pipeline",
+
+        "STEP 1 - Frame Extraction & Image Clustering": {
+            "video_path": "Path to a video file, a folder containing videos, OR a folder containing images",
+            "frame_threshold": "Similarity threshold (0-1). Higher = keep more similar frames, lower = filter aggressively",
+            "target_fps": "Frames per second to extract (e.g., 3.0 = 3 frames per second). Only used for video input",
+            "frame_interval": "Alternative: extract every Nth frame. Use null to use target_fps instead",
+            "max_frames": "Maximum frames to extract. Use null for no limit",
+            "histogram_bins": "Bins for histogram comparison. Higher = more precise similarity detection",
+            "frame_prefix": "Filename prefix for extracted frames (e.g., 'frame' -> frame_0001.jpg)",
+            "blur_threshold": "Laplacian variance threshold. Frames/images below this are considered blurry and skipped. Default: 100.0",
+            "clustering_eps": "DBSCAN eps (max neighbor distance). null = auto-derived from 1.0 - frame_threshold",
+            "clustering_min_samples": "DBSCAN min_samples parameter. Default: 2",
+            "clustering_deleted_dir": "Directory where non-representative and blurry images are moved. Default: ./deleted/clustering",
+            "clustering_method": "Clustering algorithm: 'sequential' (fast, for video frames) or 'dbscan' (thorough, for mixed images). null = prompt user",
+            "clustering_window_size": "For sequential method: number of neighboring frames to compare. Default: 10"
+        },
+
+        "STEP 2 - Image Filtering": {
+            "filter_input_dir": "Directory containing images to filter (typically extracted frames)",
+            "kept_images_dir": "Directory where approved images are moved",
+            "deleted_images_dir": "Directory where rejected images are moved",
+            "move_to_trash": "true = move rejected to deleted_images_dir, false = permanently delete",
+            "image_extensions": "List of image file extensions to process"
+        },
+
+        "STEP 3 - Anonymization": {
+            "anonymize_input_dir": "Directory containing images to anonymize (typically kept_images)",
+            "anonymize_output_dir": "Directory where anonymized images are saved",
+            "anonymizer_weights_dir": "Directory to store/load anonymizer model weights",
+            "face_threshold": "Detection threshold for faces (0.0-1.0). Lower = more sensitive, may have false positives",
+            "plate_threshold": "Detection threshold for license plates (0.0-1.0). Lower = more sensitive",
+            "obfuscation_kernel": "Blur parameters: kernel_size,sigma,box_kernel_size (e.g., '65,3,19')"
+        },
+
+        "STEP 4 - Labeling": {
+            "labeling_input_dir": "Directory containing images to label with X-AnyLabeling",
+            "anylabeling_venv": "Python virtual environment name where X-AnyLabeling is installed",
+            "anylabeling_repo": "Path to the X-AnyLabeling source repo (added to PYTHONPATH)",
+            "deleted_empty_labels_dir": "Directory where images with empty/missing labels are moved. Default: ./deleted/empty_labels"
+        },
+
+        "STEP 5 - Consolidate": {
+            "consolidated_output_dir": "Directory where images and labels are gathered together",
+            "include_labels": "true = include label files, false = images only",
+            "copy_files": "true = copy files, false = move files (removes from source)",
+            "label_format": "Label format: 'json' (LabelMe), 'txt' (YOLO), 'xml' (Pascal VOC)"
+        },
+
+        "STEP 6 - Review Labels": {
+            "review_output_dir": "Directory where saved review screenshots are stored"
+        },
+
+        "YOLO Auto-Labeling (yolo_labeling_workflow.py)": {
+            "yolo_model_path": "Path to trained YOLO model weights (.pt or .onnx)",
+            "autolabel_input_dir": "Directory containing images to auto-label (typically extracted_frames)",
+            "autolabel_confidence": "Confidence threshold for detections (0.0-1.0). Lower = more detections",
+            "autolabel_iou": "IoU threshold for NMS (0.0-1.0). Lower = fewer overlapping boxes",
+            "autolabel_imgsz": "Input image size for YOLO inference (e.g., 640)",
+            "autolabel_device": "CUDA device (e.g., '0', '0,1', 'cpu'). Empty string = auto",
+            "autolabel_delete_unlabeled": "true = remove images with no detections, false = keep all",
+            "autolabel_deleted_dir": "Directory where unlabeled images are moved. Default: ./deleted/unlabeled",
+            "yolo_train_ratio": "Train/val split ratio for YOLO conversion (0.0-1.0). Default: 0.8",
+            "yolo_classes_file": "Path to classes.txt for YOLO conversion. null = auto-detect from JSON labels"
+        }
+    },
+
+    "video_path": "",
+    "frame_threshold": 0.9,
+    "target_fps": 3.0,
+    "frame_interval": null,
+    "max_frames": null,
+    "histogram_bins": 32,
+    "frame_prefix": "frame",
+    "blur_threshold": 80.0,
+    "clustering_eps": null,
+    "clustering_min_samples": 2,
+    "clustering_deleted_dir": "./deleted/clustering",
+    "clustering_method": null,
+    "clustering_window_size": 10,
+
+    "filter_input_dir": "./extracted_frames",
+    "kept_images_dir": "./kept_images",
+    "deleted_images_dir": "./deleted/filtered",
+    "move_to_trash": true,
+    "image_extensions": ["jpg", "jpeg", "png", "bmp", "tiff", "webp"],
+
+    "anonymize_input_dir": "./kept_images",
+    "anonymize_output_dir": "./anonymized_images",
+    "anonymizer_weights_dir": "./anonymizer_weights",
+    "face_threshold": 0.3,
+    "plate_threshold": 0.3,
+    "obfuscation_kernel": "65,3,19",
+
+    "labeling_input_dir": "./anonymized_images",
+    "anylabeling_venv": "x-anylabeling_env",
+    "anylabeling_repo": "~/AI_Hub/X-AnyLabeling",
+    "deleted_empty_labels_dir": "./deleted/empty_labels",
+
+    "consolidated_output_dir": "./Dataset",
+    "include_labels": true,
+    "copy_files": true,
+    "label_format": "json",
+
+    "review_output_dir": "./reviewed_images",
+
+    "yolo_model_path": "",
+    "autolabel_input_dir": "./extracted_frames",
+    "autolabel_confidence": 0.33,
+    "autolabel_iou": 0.7,
+    "autolabel_imgsz": 640,
+    "autolabel_device": "0",
+    "autolabel_delete_unlabeled": true,
+    "autolabel_deleted_dir": "./deleted/unlabeled",
+    "yolo_train_ratio": 0.8,
+    "yolo_classes_file": null
+}
