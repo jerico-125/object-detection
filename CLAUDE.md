@@ -190,4 +190,6 @@ Each entry must include:
 - Explicit list of which code files were modified (by filename)
 - Bullet-point explanation of what was changed and why
 
-**IMPORTANT:** Never modify past log entries. Only add new entries at the top of the file. Historical logs must remain unchanged to maintain an accurate project history.
+**IMPORTANT:**
+- Never modify past log entries. Only add new entries at the top of the file. Historical logs must remain unchanged to maintain an accurate project history.
+- **DO NOT FORGET to record changes to LOG.md immediately after making any code modifications.** This includes edits, file renames, deletions, and new files. Always update LOG.md before committing to git.

@@ -2,6 +2,45 @@
 
 ## 2026-02-04
 
+- **Moved train_yolo.py from YOLO_Training to Pipeline directory**:
+  - Moved file: `YOLO_Training/train_yolo.py` → `Pipeline/train_yolo.py`
+  - Modified file: `Pipeline/yolo_training_workflow.py`
+  - Removed YOLO_TRAINING_DIR path manipulation from workflow
+  - Updated import to directly import from current directory (Pipeline)
+  - Updated error message to reflect new location
+  - Rationale: Consolidates all pipeline steps into Pipeline directory for better organization
+
+- **Removed entire YOLO_Training directory and all files**:
+  - Deleted files: `YOLO_Training/convert_json_to_yolo.py`, `YOLO_Training/args.yaml`, `YOLO_Training/best.onnx`, `YOLO_Training/convert_json_to_yolo.py:Zone.Identifier`, `YOLO_Training/x_anylabeling_config.yaml`, `YOLO_Training/dataset.yaml`
+  - Rationale:
+    - `convert_json_to_yolo.py` - Unused by workflow; conversion is handled by consolidate.py
+    - `args.yaml` - Auto-generated training history record, not used as input
+    - `best.onnx` - Optional reference model, not required for workflow
+    - `convert_json_to_yolo.py:Zone.Identifier` - Windows security metadata file
+    - `x_anylabeling_config.yaml` - Misplaced config file not used in YOLO training
+    - `dataset.yaml` - Template file; workflow auto-generates dataset.yaml in consolidated output directory
+    - `train_yolo.py` - Moved to Pipeline directory (see above)
+  - YOLO_Training directory is now empty and can be removed
+
+- **Enhanced logging policy in CLAUDE.md**:
+  - Modified file: `CLAUDE.md`
+  - Added explicit reminder to record changes to LOG.md immediately after code modifications
+  - Emphasized that LOG.md updates should happen before git commits
+  - Rationale: Ensures no changes are forgotten in the changelog
+
+- **Removed unused convert_json_to_yolo import from yolo_training_workflow.py**:
+  - Modified file: `Pipeline/yolo_training_workflow.py`
+  - Removed unused import: `from convert_json_to_yolo import convert_dataset`
+  - Removed `convert_dataset = None` fallback variable
+  - Updated error message to only mention train_yolo.py requirement
+  - Rationale: YOLO conversion is handled by consolidate.py's built-in code (_convert_to_yolo_format function), not the standalone convert_json_to_yolo.py module. The import was never used in the workflow.
+
+---
+**Git commit cdf768f** ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+---
+
+## 2026-02-04
+
 - **Updated logging policy in CLAUDE.md**:
   - Modified file: `CLAUDE.md`
   - Added explicit instruction to never modify past log entries

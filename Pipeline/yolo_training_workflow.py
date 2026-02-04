@@ -46,16 +46,11 @@ from labeling import run_labeling
 from consolidate import consolidate_files
 
 # Import YOLO training utilities
-YOLO_TRAINING_DIR = Path(__file__).parent.parent / "YOLO_Training"
-sys.path.insert(0, str(YOLO_TRAINING_DIR))
-
 try:
-    from convert_json_to_yolo import convert_dataset
     from train_yolo import train_yolo
 except ImportError as e:
-    print(f"{RED}Warning: Could not import YOLO training modules: {e}{RESET}")
-    print(f"{RED}Make sure YOLO_Training directory contains convert_json_to_yolo.py and train_yolo.py{RESET}")
-    convert_dataset = None
+    print(f"{RED}Warning: Could not import YOLO training module: {e}{RESET}")
+    print(f"{RED}Make sure train_yolo.py is in the Pipeline directory{RESET}")
     train_yolo = None
 
 
