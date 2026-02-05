@@ -217,22 +217,56 @@ def train_yolo_model(config, **kwargs):
 
     # Get dataset.yaml path
     yaml_path = config.get("yolo_dataset_yaml")
-    if not yaml_path:
-        # Try to find it in the consolidated directory
-        consolidated_dir = config.get("consolidated_output_dir", "./Dataset")
-        yaml_path = Path(consolidated_dir) / "dataset.yaml"
-        if not yaml_path.exists():
-            print(f"{RED}Error: dataset.yaml not found. Run step 5 first.{RESET}")
-            return False
-        yaml_path = str(yaml_path)
 
-    if not Path(yaml_path).exists():
+    # If Step 5 output exists, use it as default
+    default_yaml = None
+    if yaml_path and Path(yaml_path).exists():
+        default_yaml = yaml_path
+    else:
+        # Try to find it in the Step 5 output directory
+        consolidated_dir = config.get("consolidated_output_dir", "./Dataset")
+        potential_yaml = Path(consolidated_dir) / "dataset.yaml"
+        if potential_yaml.exists():
+            default_yaml = str(potential_yaml)
+
+    # Prompt user for dataset.yaml path
+    print()
+    if default_yaml:
+        print(f"Default dataset.yaml from Step 5: {default_yaml}")
+        user_input = input(f"{GREEN}Press Enter to use default, or enter path to dataset.yaml: {RESET}").strip()
+        if user_input:
+            yaml_path = user_input
+        else:
+            yaml_path = default_yaml
+    else:
+        print(f"{YELLOW}Warning: No dataset.yaml found from Step 5.{RESET}")
+        user_input = input(f"{GREEN}Enter path to dataset.yaml: {RESET}").strip()
+        if not user_input:
+            print(f"{RED}Error: dataset.yaml path is required.{RESET}")
+            return False
+        yaml_path = user_input
+
+    # Validate the path
+    yaml_path_obj = Path(yaml_path)
+    if not yaml_path_obj.exists():
         print(f"{RED}Error: dataset.yaml not found at {yaml_path}{RESET}")
-        print(f"{RED}Run step 5 (Consolidate & convert to YOLO format) first.{RESET}")
         return False
 
-    print(f"Using dataset config: {yaml_path}")
+    yaml_path = str(yaml_path_obj)
+    print(f"\nUsing dataset config: {yaml_path}")
     print()
+
+    # Prompt user for experiment name
+    default_name = config.get("train_name")
+    if default_name:
+        print(f"Default experiment name: {default_name}")
+    else:
+        print("Experiment name will be auto-generated (e.g. yolov8n_20260205_143000)")
+    user_name = input(f"{GREEN}Enter experiment name (or press Enter for default): {RESET}").strip()
+    if user_name:
+        train_name = user_name
+    else:
+        train_name = default_name  # None = auto-generate in train_yolo()
 
     # Extract training parameters from config
     train_params = {
@@ -244,7 +278,7 @@ def train_yolo_model(config, **kwargs):
         "device": config.get("train_device", ""),
         "workers": config.get("train_workers", 8),
         "project": config.get("train_project", "./runs"),
-        "name": config.get("train_name"),
+        "name": train_name,
         "resume": config.get("train_resume", False),
         "pretrained": config.get("train_pretrained", True),
         "optimizer": config.get("train_optimizer", "auto"),
@@ -256,8 +290,9 @@ def train_yolo_model(config, **kwargs):
     }
 
     # Show prompt before training
-    print(f"{YELLOW}Training configuration:{RESET}")
+    print(f"\n{YELLOW}Training configuration:{RESET}")
     print(f"  Model:      {train_params['model']}")
+    print(f"  Name:       {train_name if train_name else '(auto-generated)'}")
     print(f"  Epochs:     {train_params['epochs']}")
     print(f"  Batch size: {train_params['batch']}")
     print(f"  Image size: {train_params['imgsz']}")

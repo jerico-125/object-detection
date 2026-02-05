@@ -137,9 +137,9 @@ def remove_empty_labels(input_dir: str, label_format: str = "json",
 
     removed = 0
 
-    # Gather all image files
+    # Gather all image files (recursive search through subdirectories)
     image_files = [
-        f for f in input_path.iterdir()
+        f for f in input_path.rglob("*")
         if f.is_file() and f.suffix.lstrip(".").lower() in image_extensions
     ]
 
@@ -148,9 +148,13 @@ def remove_empty_labels(input_dir: str, label_format: str = "json",
 
         # If no label file exists, the image was never labeled — treat as empty
         if not label_file.exists() or _is_label_empty(label_file):
-            shutil.move(str(img_file), str(deleted_path / img_file.name))
+            # Preserve subdirectory structure in deleted directory
+            rel_path = img_file.relative_to(input_path)
+            dest_dir = deleted_path / rel_path.parent
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(img_file), str(dest_dir / img_file.name))
             if label_file.exists():
-                shutil.move(str(label_file), str(deleted_path / label_file.name))
+                shutil.move(str(label_file), str(dest_dir / label_file.name))
             removed += 1
 
     return removed

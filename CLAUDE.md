@@ -191,5 +191,6 @@ Each entry must include:
 - Bullet-point explanation of what was changed and why
 
 **IMPORTANT:**
-- Never modify past log entries. Only add new entries at the top of the file. Historical logs must remain unchanged to maintain an accurate project history.
+- **Insertion point:** Always add new log entries directly below the `# Change Log` heading and `---` separator — above all existing date sections. If today's date section already exists at the top, append the new bullet points to that section (below its `## YYYY-MM-DD` heading) rather than creating a duplicate date heading.
+- Never modify past log entries. Historical logs must remain unchanged to maintain an accurate project history.
 - **DO NOT FORGET to record changes to LOG.md immediately after making any code modifications.** This includes edits, file renames, deletions, and new files. Always update LOG.md before committing to git.

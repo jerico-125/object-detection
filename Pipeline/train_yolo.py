@@ -161,7 +161,7 @@ def train_yolo(
     imgsz: int = 640,
     device: str = "",
     workers: int = 8,
-    project: str = ".",
+    project: str = "./YOLO_result",
     name: str = None,
     resume: bool = False,
     pretrained: bool = True,
@@ -484,8 +484,8 @@ def main():
     parser.add_argument(
         "--project",
         type=str,
-        default=".",
-        help="Project directory for results (default: current directory)"
+        default="./YOLO_result",
+        help="Project directory for results (default: ./YOLO_result)"
     )
     parser.add_argument(
         "--name",

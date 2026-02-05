@@ -1,5 +1,63 @@
 # Change Log
 
+---
+
+## 2026-02-05
+
+- **Added experiment name prompt to Step 6 YOLO training**:
+  - Modified file: `Pipeline/yolo_training_workflow.py`
+  - Step 6 now prompts the user to enter an experiment name before training starts
+  - If user presses Enter, falls back to config `train_name` or auto-generates a timestamp-based name
+  - Name is displayed in the training configuration summary
+  - Rationale: Lets users name their training runs for easier identification
+
+- **Made empty label cleanup search subdirectories recursively**:
+  - Modified file: `Pipeline/labeling.py`
+  - Changed `remove_empty_labels()` from `input_path.iterdir()` to `input_path.rglob("*")` so it finds images in subdirectories
+  - Preserves subdirectory structure when moving files to `deleted/empty_labels/`
+  - Rationale: Input directories may contain images organized in subfolders
+
+- **Clarified log insertion rule in CLAUDE.md**:
+  - Modified file: `CLAUDE.md`
+  - Updated Logging Policy to explicitly state that new entries must be added directly below the `# Change Log` heading and `---` separator, above all existing date sections
+  - Added rule: if today's date section already exists at the top, append to it instead of creating a duplicate
+  - Rationale: Previous wording ("add at the top") was ambiguous and caused inconsistent placement
+
+- **Enhanced Step 6 dataset.yaml prompt with Step 5 output as default**:
+  - Modified file: `Pipeline/yolo_training_workflow.py`
+  - Step 6 now prompts user for dataset.yaml path instead of failing automatically
+  - Uses Step 5 output directory as default (if dataset.yaml exists there)
+  - If Step 5 was skipped or no dataset.yaml found, prompts user to enter path manually
+  - Validates path exists before proceeding with training
+  - Rationale: Allows users to specify custom dataset.yaml paths when Step 5 is skipped or use different datasets
+
+- **Added per-frame FPS, GPU info, and FP16 acceleration to video inference**:
+  - Modified file: `Pipeline/video_inference.py`
+  - Batch mode now shows live per-frame FPS (smoothed) during processing, not just avg at end
+  - Added `print_device_info()` — prints GPU name and memory at startup, or "CPU" if no CUDA
+  - Added `--half` flag for FP16 half-precision inference (faster on GPUs with Tensor Cores)
+  - Startup info now includes video duration and FP16 status
+  - Rationale: Better speed visibility and GPU acceleration option
+
+- **Created standalone YOLO video inference script with two modes**:
+  - New file: `Pipeline/video_inference.py`
+  - **Batch mode** (default): Processes video without display, saves annotated output MP4, shows progress and avg FPS
+  - **Real-time mode** (`--show`): Opens OpenCV window with live bounding boxes, class labels, confidence scores, smoothed FPS counter, and detection count overlay. Press 'q' to quit
+  - Both modes support: video files, webcam (`--source 0`), stream URLs, `.pt` and `.onnx` models
+  - Optional `--save` flag in real-time mode to also write output video
+  - Configurable confidence, IoU, image size, device, and class filtering via CLI args
+  - Rationale: Standalone inference tool separate from the training pipeline
+
+- **Changed default training results save location**:
+  - Modified file: `Pipeline/train_yolo.py`
+  - Changed default `project` parameter from `"."` to `"./YOLO_result"` (lines 164, 488)
+  - Training results now save to `./YOLO_result/runs/train/<experiment_name>/` by default instead of `./runs/train/<experiment_name>/`
+  - Rationale: Keeps training outputs organized in a dedicated directory separate from other pipeline outputs
+
+---
+**Git commit dad8a17** ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+---
+
 ## 2026-02-04
 
 - **Moved train_yolo.py from YOLO_Training to Pipeline directory**:
