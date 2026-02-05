@@ -21,11 +21,16 @@ Usage:
 """
 
 import argparse
+import os
 import time
+from pathlib import Path
 
 import cv2
 import torch
 from ultralytics import YOLO
+
+# Default directory for YOLO version runs
+DEFAULT_RUNS_DIR = "/home/aidall/AI_Hub/runs/detect/runs"
 
 
 def print_device_info(device):
@@ -233,19 +238,20 @@ GPU acceleration:
   YOLO uses GPU automatically if CUDA is available. Use --half for FP16 speed boost.
 
 Examples:
-  python video_inference.py --source video.mp4 --model best.pt              # batch mode
-  python video_inference.py --source video.mp4 --model best.pt --show       # real-time
-  python video_inference.py --source video.mp4 --model best.pt --show --save  # real-time + save
-  python video_inference.py --source 0 --model best.pt --show               # webcam
-  python video_inference.py --source video.mp4 --model best.pt --half       # FP16 faster
-  python video_inference.py --source video.mp4 --model best.pt --classes 0 2 5
+  python video_inference.py --source video.mp4                              # uses latest YOLO_v*
+  python video_inference.py --source video.mp4 --model best.pt              # specific model
+  python video_inference.py --source video.mp4 --show                       # real-time
+  python video_inference.py --source video.mp4 --show --save                # real-time + save
+  python video_inference.py --source 0 --show                               # webcam
+  python video_inference.py --source video.mp4 --half                       # FP16 faster
+  python video_inference.py --source video.mp4 --classes 0 2 5
         """,
     )
 
     parser.add_argument("--source", required=True,
                         help="Video file path, camera index (0, 1, ...), or stream URL")
-    parser.add_argument("--model", required=True,
-                        help="Path to YOLO model (.pt or .onnx)")
+    parser.add_argument("--model", default=None,
+                        help="Path to YOLO model (.pt or .onnx). Default: latest YOLO_v* model")
     parser.add_argument("--conf", type=float, default=0.25,
                         help="Confidence threshold (default: 0.25)")
     parser.add_argument("--iou", type=float, default=0.45,
@@ -265,6 +271,15 @@ Examples:
 
     args = parser.parse_args()
 
+    # Resolve model path
+    model_path = args.model
+    if model_path is None:
+        from model_utils import select_yolo_model
+        model_path = select_yolo_model(runs_dir=DEFAULT_RUNS_DIR)
+        if not model_path:
+            print("\033[91mError: No model specified.\033[0m")
+            return
+
     # If source is a number, treat it as a camera index
     try:
         source = int(args.source)
@@ -273,7 +288,7 @@ Examples:
 
     run_inference(
         source=source,
-        model_path=args.model,
+        model_path=model_path,
         conf=args.conf,
         iou=args.iou,
         imgsz=args.imgsz,

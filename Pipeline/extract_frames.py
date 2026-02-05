@@ -1199,7 +1199,4 @@ def extract_video_frames(config: Dict[str, Any], from_previous_step: bool = Fals
         config["extracted_frames_dir"] = output_dir
         config["video_name"] = video_name
 
-    # Update config for next step
-    config["filter_input_dir"] = config["extracted_frames_dir"]
-
     return True

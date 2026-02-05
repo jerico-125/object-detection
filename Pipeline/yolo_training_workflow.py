@@ -74,7 +74,6 @@ DEFAULT_CONFIG = {
     "clustering_min_samples": 2,
 
     # Step 2: YOLO auto-labeling
-    "yolo_model_path": "",
     "autolabel_input_dir": "./extracted_frames",
     "autolabel_confidence": 0.25,
     "autolabel_iou": 0.45,
@@ -82,6 +81,7 @@ DEFAULT_CONFIG = {
     "autolabel_device": "",
     "autolabel_delete_unlabeled": True,
     "autolabel_deleted_dir": "./deleted/unlabeled",
+    "autolabel_output_dir": "./autolabeled",
 
     # Step 3: Anonymization
     "anonymize_input_dir": "./extracted_frames",
@@ -108,7 +108,7 @@ DEFAULT_CONFIG = {
     "yolo_classes_file": None,
 
     # Step 6: Train YOLO model
-    "train_model": "yolov8n.pt",
+    "yolo_runs_dir": "/home/aidall/AI_Hub/runs/detect/runs",
     "train_epochs": 100,
     "train_batch": 16,
     "train_imgsz": 640,
@@ -256,28 +256,33 @@ def train_yolo_model(config, **kwargs):
     print(f"\nUsing dataset config: {yaml_path}")
     print()
 
-    # Prompt user for experiment name
-    default_name = config.get("train_name")
-    if default_name:
-        print(f"Default experiment name: {default_name}")
-    else:
-        print("Experiment name will be auto-generated (e.g. yolov8n_20260205_143000)")
-    user_name = input(f"{GREEN}Enter experiment name (or press Enter for default): {RESET}").strip()
-    if user_name:
-        train_name = user_name
-    else:
-        train_name = default_name  # None = auto-generate in train_yolo()
+    # Determine version number and select base model
+    from model_utils import find_yolo_versions, select_yolo_model
+    runs_dir = Path(os.path.expanduser(config.get("yolo_runs_dir", "/home/aidall/AI_Hub/runs/detect/runs")))
+    versions = find_yolo_versions(str(runs_dir))
+    latest_version = max(versions.keys()) if versions else 0
+    version_num = latest_version + 1
+    train_name = f"YOLO_v{version_num}"
+
+    # Select base model (select_yolo_model lists available versions)
+    print(f"\nSelect base model for training:")
+    train_model = select_yolo_model(runs_dir=str(runs_dir))
+    if not train_model:
+        train_model = "yolov8n.pt"
+        print(f"Using default model: {train_model}")
+
+    print(f"\nNew training run: {train_name}")
 
     # Extract training parameters from config
     train_params = {
         "data": yaml_path,
-        "model": config.get("train_model", "yolov8n.pt"),
+        "model": train_model,
         "epochs": config.get("train_epochs", 100),
         "batch": config.get("train_batch", 16),
         "imgsz": config.get("train_imgsz", 640),
         "device": config.get("train_device", ""),
         "workers": config.get("train_workers", 8),
-        "project": config.get("train_project", "./runs"),
+        "project": str(runs_dir),
         "name": train_name,
         "resume": config.get("train_resume", False),
         "pretrained": config.get("train_pretrained", True),
@@ -292,7 +297,8 @@ def train_yolo_model(config, **kwargs):
     # Show prompt before training
     print(f"\n{YELLOW}Training configuration:{RESET}")
     print(f"  Model:      {train_params['model']}")
-    print(f"  Name:       {train_name if train_name else '(auto-generated)'}")
+    print(f"  Name:       {train_name}")
+    print(f"  Save to:    {runs_dir / train_name}")
     print(f"  Epochs:     {train_params['epochs']}")
     print(f"  Batch size: {train_params['batch']}")
     print(f"  Image size: {train_params['imgsz']}")
@@ -364,7 +370,7 @@ def _get_step_output_dir(step_num, config):
     """Return the output directory for a given step based on config."""
     mapping = {
         1: "extracted_frames_dir",
-        2: "autolabel_input_dir",
+        2: "autolabel_output_result_dir",
         3: "anonymize_output_dir",
         4: "labeling_input_dir",
         5: "consolidated_output_dir",
@@ -436,13 +442,19 @@ def run_workflow(start_step: int, config: Dict[str, Any]) -> bool:
 
         if not success:
             print(f"\nStep {step_num} encountered an issue.")
-            continue_choice = input(f"{GREEN}Continue to next step anyway? (y/n): {RESET}").strip().lower()
-            if continue_choice != 'y':
+            if step_num < 6:
+                next_step_name = steps[step_num][1]
+                continue_choice = input(f"{GREEN}Continue to Step {step_num + 1} - {next_step_name} anyway? (y/n): {RESET}").strip().lower()
+                if continue_choice != 'y':
+                    print("\nWorkflow stopped.")
+                    print_summary(results, config)
+                    return False
+                from_previous_step = True
+            else:
                 print("\nWorkflow stopped.")
                 print_summary(results, config)
                 return False
-
-        if step_num < 6:
+        elif step_num < 6:
             next_step_name = steps[step_num][1]
             print()
             next_choice = input(f"{GREEN}Step {step_num} done. Continue to Step {step_num + 1} - {next_step_name}? (y/n): {RESET}").strip().lower()
@@ -553,8 +565,6 @@ Steps:
                        help='Generate a template configuration file')
     parser.add_argument('--video', '-v', type=str,
                        help='Path to input video file (for step 1)')
-    parser.add_argument('--model', '-m', type=str,
-                       help='Path to YOLO model weights (for step 2)')
 
     args = parser.parse_args()
 
@@ -593,8 +603,6 @@ Steps:
     # Override from command-line args
     if args.video:
         config["video_path"] = args.video
-    if args.model:
-        config["yolo_model_path"] = args.model
 
     print()
 

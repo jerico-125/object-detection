@@ -18,16 +18,8 @@
             "clustering_window_size": "For sequential method: number of neighboring frames to compare. Default: 10"
         },
 
-        "STEP 2 - Image Filtering": {
-            "filter_input_dir": "Directory containing images to filter (typically extracted frames)",
-            "kept_images_dir": "Directory where approved images are moved",
-            "deleted_images_dir": "Directory where rejected images are moved",
-            "move_to_trash": "true = move rejected to deleted_images_dir, false = permanently delete",
-            "image_extensions": "List of image file extensions to process"
-        },
-
-        "STEP 3 - Anonymization": {
-            "anonymize_input_dir": "Directory containing images to anonymize (typically kept_images)",
+        "STEP 2 - Anonymization": {
+            "anonymize_input_dir": "Directory containing images to anonymize (typically extracted_frames)",
             "anonymize_output_dir": "Directory where anonymized images are saved",
             "anonymizer_weights_dir": "Directory to store/load anonymizer model weights",
             "face_threshold": "Detection threshold for faces (0.0-1.0). Lower = more sensitive, may have false positives",
@@ -35,26 +27,21 @@
             "obfuscation_kernel": "Blur parameters: kernel_size,sigma,box_kernel_size (e.g., '65,3,19')"
         },
 
-        "STEP 4 - Labeling": {
+        "STEP 3 - Labeling": {
             "labeling_input_dir": "Directory containing images to label with X-AnyLabeling",
             "anylabeling_venv": "Python virtual environment name where X-AnyLabeling is installed",
             "anylabeling_repo": "Path to the X-AnyLabeling source repo (added to PYTHONPATH)",
             "deleted_empty_labels_dir": "Directory where images with empty/missing labels are moved. Default: ./deleted/empty_labels"
         },
 
-        "STEP 5 - Consolidate": {
+        "STEP 4 - Consolidate": {
             "consolidated_output_dir": "Directory where images and labels are gathered together",
             "include_labels": "true = include label files, false = images only",
             "copy_files": "true = copy files, false = move files (removes from source)",
             "label_format": "Label format: 'json' (LabelMe), 'txt' (YOLO), 'xml' (Pascal VOC)"
         },
 
-        "STEP 6 - Review Labels": {
-            "review_output_dir": "Directory where saved review screenshots are stored"
-        },
-
         "YOLO Training Workflow (yolo_training_workflow.py)": {
-            "yolo_model_path": "Path to trained YOLO model weights (.pt or .onnx)",
             "autolabel_input_dir": "Directory containing images to auto-label (typically extracted_frames)",
             "autolabel_confidence": "Confidence threshold for detections (0.0-1.0). Lower = more detections",
             "autolabel_iou": "IoU threshold for NMS (0.0-1.0). Lower = fewer overlapping boxes",
@@ -62,12 +49,12 @@
             "autolabel_device": "CUDA device (e.g., '0', '0,1', 'cpu'). Empty string = auto",
             "autolabel_delete_unlabeled": "true = remove images with no detections, false = keep all",
             "autolabel_deleted_dir": "Directory where unlabeled images are moved. Default: ./deleted/unlabeled",
+            "autolabel_output_dir": "Directory where labeled images and labels are copied to. Default: ./autolabeled",
             "yolo_train_ratio": "Train/val split ratio for YOLO conversion (0.0-1.0). Default: 0.8",
             "yolo_classes_file": "Path to classes.txt for YOLO conversion. null = auto-detect from JSON labels"
         },
 
         "YOLO Training (yolo_training_workflow.py Step 6)": {
-            "train_model": "Model to use: yolov8n/s/m/l/x.pt or path to custom weights. Default: yolov8n.pt",
             "train_epochs": "Number of training epochs. Default: 100",
             "train_batch": "Batch size (-1 for auto-batch). Default: 16",
             "train_imgsz": "Input image size (e.g., 640, 1280). Default: 640",
@@ -100,13 +87,9 @@
     "clustering_method": null,
     "clustering_window_size": 10,
 
-    "filter_input_dir": "./extracted_frames",
-    "kept_images_dir": "./kept_images",
-    "deleted_images_dir": "./deleted/filtered",
-    "move_to_trash": true,
     "image_extensions": ["jpg", "jpeg", "png", "bmp", "tiff", "webp"],
 
-    "anonymize_input_dir": "./kept_images",
+    "anonymize_input_dir": "./extracted_frames",
     "anonymize_output_dir": "./anonymized_images",
     "anonymizer_weights_dir": "./anonymizer_weights",
     "face_threshold": 0.3,
@@ -123,9 +106,6 @@
     "copy_files": true,
     "label_format": "json",
 
-    "review_output_dir": "./reviewed_images",
-
-    "yolo_model_path": "",
     "autolabel_input_dir": "./extracted_frames",
     "autolabel_confidence": 0.33,
     "autolabel_iou": 0.7,
@@ -133,11 +113,11 @@
     "autolabel_device": "0",
     "autolabel_delete_unlabeled": true,
     "autolabel_deleted_dir": "./deleted/unlabeled",
+    "autolabel_output_dir": "./autolabeled",
     "yolo_train_ratio": 0.8,
     "yolo_classes_file": null,
 
-    "train_model": "yolov8n.pt",
-    "train_epochs": 100,
+    "train_epochs": 150,
     "train_batch": 16,
     "train_imgsz": 640,
     "train_device": "",
@@ -148,7 +128,7 @@
     "train_pretrained": true,
     "train_optimizer": "auto",
     "train_lr0": 0.01,
-    "train_patience": 50,
+    "train_patience": 100,
     "train_cache": false,
     "train_amp": true,
     "train_augment": true

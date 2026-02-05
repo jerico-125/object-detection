@@ -81,17 +81,16 @@ def anonymize_images(config: Dict[str, Any], from_previous_step: bool = False) -
 
     # Determine input directory
     if from_previous_step:
-        # Prefer labeling_input_dir (set by autolabel) over kept_images_dir
         if config.get("labeling_input_dir") and os.path.exists(config["labeling_input_dir"]):
             input_dir = config["labeling_input_dir"]
         else:
-            base_input = config.get("kept_images_dir", "./kept_images")
+            base_input = config.get("anonymize_input_dir", "./extracted_frames")
             if video_name:
                 input_dir = f"{base_input}/{video_name}"
             else:
                 input_dir = base_input
     else:
-        base_dir = config.get("anonymize_input_dir", "./kept_images")
+        base_dir = config.get("anonymize_input_dir", "./extracted_frames")
         input_dir = prompt_with_directory_options(
             "Enter the directory containing images to anonymize",
             base_dir,

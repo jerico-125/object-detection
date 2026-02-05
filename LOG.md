@@ -4,6 +4,94 @@
 
 ## 2026-02-05
 
+- **Autolabel now copies labeled images and labels into a separate output folder**:
+  - Modified files: `Pipeline/autolabel.py`, `Pipeline/workflow_config.json`, `Pipeline/yolo_training_workflow.py`, `CLAUDE.md`
+  - Added `autolabel_output_dir` config option (default `./autolabeled`) — labeled images and their JSON labels are copied into this directory after inference
+  - Added `output_dir` parameter to `run_yolo_inference()` — when set, each labeled image and its JSON file are copied to the output directory
+  - Updated `yolo_autolabel()` to resolve `autolabel_output_dir` (appending video name as subdirectory when available) and pass it to inference
+  - Updated config chaining: `config["labeling_input_dir"]` now points to the output directory so the next workflow step (anonymize) reads from it
+  - Updated `_get_step_output_dir` in `yolo_training_workflow.py` to show autolabel output directory in workflow summary
+  - Added `autolabel_output_dir` to `DEFAULT_CONFIG`, `workflow_config.json` (doc + value sections), and `CLAUDE.md`
+  - Rationale: Keeps original extracted frames untouched; labeled results are isolated in their own folder for downstream steps
+
+- **Removed dead config keys left over from deleted filtering step**:
+  - Modified files: `Pipeline/workflow_config.json`, `Pipeline/extract_frames.py`, `Pipeline/anonymize.py`
+  - Removed `filter_input_dir`, `kept_images_dir`, `deleted_images_dir`, `move_to_trash` from `workflow_config.json` (both documentation and value sections) — these belonged to the deleted `filter_images.py` step and were never read
+  - Removed `review_output_dir` from `workflow_config.json` — no code reads this key (consolidate.py writes `review_input_dir`, a different name)
+  - Removed dead `filter_input_dir` assignment from `extract_frames.py` (line 1203)
+  - Updated `anonymize.py` fallback: replaced `kept_images_dir` reference with `anonymize_input_dir` (the filtering step no longer exists)
+  - Changed `anonymize_input_dir` default from `./kept_images` to `./extracted_frames` in both `workflow_config.json` and `anonymize.py`
+  - Renumbered documentation steps in `workflow_config.json` (removed "Step 2 - Image Filtering" gap)
+
+- **Removed `train_model` and `yolo_model_path` config keys; always prompt for model selection**:
+  - Modified files: `Pipeline/yolo_training_workflow.py`, `Pipeline/autolabel.py`, `Pipeline/workflow_config.json`
+  - Removed `train_model` from `DEFAULT_CONFIG` and `workflow_config.json` (both doc and value sections); training fallback now hardcodes `yolov8n.pt` instead of reading from config
+  - Removed `yolo_model_path` from `DEFAULT_CONFIG`, `workflow_config.json`, and `autolabel.py`; autolabel now always calls `select_yolo_model()` instead of skipping when config value was set
+  - Removed `--model` CLI arg from `yolo_training_workflow.py` (it set `yolo_model_path`, which no longer exists)
+  - Rationale: `select_yolo_model()` handles all model selection interactively; config overrides that bypass the prompt are no longer needed
+
+- **Fixed YOLO runs directory path across all pipeline scripts**:
+  - Modified files: `Pipeline/model_utils.py`, `Pipeline/autolabel.py`, `Pipeline/video_inference.py`, `Pipeline/yolo_training_workflow.py`
+  - Changed `DEFAULT_RUNS_DIR` from `~/runs/detect/runs` to `/home/aidall/AI_Hub/runs/detect/runs` in all four files
+  - Also updated the fallback default in `yolo_training_workflow.py` `train_yolo_model()` and `DEFAULT_CONFIG`
+  - Rationale: The correct path is `/home/aidall/AI_Hub/runs/detect/runs`, not the current user's home directory
+
+- **Fixed duplicate continuation prompt in YOLO workflow**:
+  - Modified file: `Pipeline/yolo_training_workflow.py`
+  - When a step failed, the user was prompted "Continue to next step anyway?" and then immediately prompted again "Step X done. Continue to Step Y?" — a redundant double prompt
+  - Restructured the logic so the failure path and success path each show a single, appropriate prompt: failure says "Continue to Step Y anyway?", success says "Step X done. Continue to Step Y?"
+  - Rationale: Eliminates confusing duplicate prompt after step failures
+
+- **Refactored YOLO model selection into shared interactive selector**:
+  - New file: `Pipeline/model_utils.py`
+  - Modified files: `Pipeline/autolabel.py`, `Pipeline/video_inference.py`, `Pipeline/yolo_training_workflow.py`
+  - Created `model_utils.py` with `find_yolo_versions()` and `select_yolo_model()` — shared utilities for discovering and interactively selecting YOLO models
+  - `select_yolo_model()` lists all `YOLO_v*` versions in the runs directory, suggests the latest as default (Enter to accept), lets user type a different version number (confirms before proceeding), or type `'c'` for a custom path
+  - Removed duplicate `find_latest_yolo_model()` from `autolabel.py` and `video_inference.py`
+  - `autolabel.py`: replaced inline model discovery + Y/n prompt with `select_yolo_model()` call
+  - `video_inference.py`: replaced inline model discovery + Y/n prompt with `select_yolo_model()` call
+  - `yolo_training_workflow.py`: replaced inline version scanning and model selection logic with `find_yolo_versions()` + `select_yolo_model()`; version number for new training run is now auto-incremented from highest existing version (no manual version prompt); base model selection uses the shared interactive selector
+  - Rationale: Eliminates duplicated model discovery code, provides consistent interactive model selection UX across the pipeline
+
+**Git commit c73209c** ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+---
+
+## 2026-02-05
+
+- **Consolidated training model prompt into single question and fixed runs path**:
+  - Modified files: `Pipeline/yolo_training_workflow.py`, `Pipeline/video_inference.py`, `Pipeline/autolabel.py`
+  - Training Step 6: Combined model selection into one prompt — "Press Enter to use this model, or enter a version number"
+  - If a version number is entered, looks up that version's `best.pt` and asks "Use this model?"
+  - If version not found, falls back to manual path entry
+  - Changed default `yolo_runs_dir` from `~/AI_Hub/runs/detect/runs` to `~/runs/detect/runs` in all three files (code runs inside AI_Hub)
+  - Rationale: Single prompt is cleaner; path fix matches actual runtime directory
+
+- **Added latest YOLO_v* model auto-detection to video inference and auto-labeling**:
+  - Modified files: `Pipeline/video_inference.py`, `Pipeline/autolabel.py`
+  - Both scripts now include `find_latest_yolo_model()` to scan `~/runs/detect/runs/` for the most recent `YOLO_v*` model
+  - `video_inference.py`: `--model` is now optional; if omitted, finds latest model and prompts user to confirm before using it
+  - `autolabel.py`: When no `yolo_model_path` in config, finds latest model and prompts user to confirm before using it
+  - All three tools (training, inference, auto-labeling) now prompt the user to confirm the model choice
+  - Rationale: Consistent model selection across the pipeline with user confirmation
+
+- **Added YOLO versioning and auto model selection to Step 6 training**:
+  - Modified file: `Pipeline/yolo_training_workflow.py`
+  - Step 6 now scans `~/runs/detect/runs/` for existing `YOLO_v*` folders
+  - Lists all existing versions and shows the most recent one
+  - Prompts user for version number (default: next version, e.g. YOLO_v3)
+  - Experiment name is now `YOLO_v<N>` instead of free-form text
+  - Automatically uses `best.pt` from the most recent version as the base model for training
+  - Falls back to config `train_model` (default `yolov8n.pt`) if no previous version exists
+  - Training output saves to the runs directory (e.g. `~/AI_Hub/runs/detect/runs/YOLO_v3/`)
+  - Added `yolo_runs_dir` config key (default: `~/AI_Hub/runs/detect/runs`)
+  - Rationale: Consistent versioning scheme and transfer learning from the latest trained model
+
+- **Added git commit separator rule to CLAUDE.md**:
+  - Modified file: `CLAUDE.md`
+  - Added instruction to place git commit separators above the log entries they cover after committing
+  - Documented the format: `**Git commit <short-hash>**...` followed by `---`
+  - Rationale: Ensures consistent commit tracking in LOG.md
+
 - **Added experiment name prompt to Step 6 YOLO training**:
   - Modified file: `Pipeline/yolo_training_workflow.py`
   - Step 6 now prompts the user to enter an experiment name before training starts

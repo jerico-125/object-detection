@@ -23,6 +23,9 @@ GREEN = "\033[92m"
 RED = "\033[91m"
 RESET = "\033[0m"
 
+# Default directory for YOLO version runs
+DEFAULT_RUNS_DIR = "/home/aidall/AI_Hub/runs/detect/runs"
+
 
 # ============================================================================
 # USER INTERACTION UTILITIES
@@ -144,10 +147,13 @@ def run_yolo_inference(
     device: str = "",
     delete_unlabeled: bool = True,
     deleted_dir: str = "./deleted/unlabeled",
+    output_dir: str = "",
 ) -> dict:
     """
     Run YOLO model on all images in a directory, save JSON labels,
     and optionally move images with no detections to deleted directory.
+
+    Labeled images and their JSON labels are copied to output_dir if provided.
 
     Args:
         model_path: Path to YOLO model weights (.pt or .onnx)
@@ -158,6 +164,7 @@ def run_yolo_inference(
         device: CUDA device or 'cpu'
         delete_unlabeled: If True, move images without detections to deleted_dir
         deleted_dir: Directory to move unlabeled images to
+        output_dir: Directory to copy labeled images and labels into (if empty, labels saved in-place)
 
     Returns:
         Dictionary with statistics
@@ -177,7 +184,14 @@ def run_yolo_inference(
         print(f"No images found in {input_dir}")
         return {'total': 0, 'labeled': 0, 'unlabeled': 0, 'deleted': 0, 'total_detections': 0}
 
+    # Create output directory for labeled images if specified
+    output_path = Path(output_dir) if output_dir else None
+    if output_path:
+        output_path.mkdir(parents=True, exist_ok=True)
+
     print(f"\nFound {len(image_files)} images")
+    if output_path:
+        print(f"Copy labeled to: {output_path}")
     print(f"Move unlabeled to: {deleted_dir}")
     Path(deleted_dir).mkdir(parents=True, exist_ok=True)
     print("-" * 50)
@@ -258,6 +272,11 @@ def run_yolo_inference(
             with open(label_path, 'w', encoding='utf-8') as f:
                 json.dump(label_data, f, indent=2, ensure_ascii=False)
 
+            # Copy labeled image and label to output directory
+            if output_path:
+                shutil.copy2(str(image_path), str(output_path / image_path.name))
+                shutil.copy2(str(label_path), str(output_path / label_path.name))
+
             pbar.update(1)
 
     pbar.close()
@@ -310,13 +329,10 @@ def yolo_autolabel(config: Dict[str, Any], from_previous_step: bool = False) -> 
         print(f"{RED}Error: Input directory '{input_dir}' does not exist.{RESET}")
         return False
 
-    # Get model path
-    model_path = config.get("yolo_model_path", "")
-    if not model_path:
-        model_path = prompt_with_default_value(
-            "Enter path to YOLO model weights (.pt or .onnx)",
-            ""
-        )
+    # Get model path — interactive selection from YOLO_v* versions
+    from model_utils import select_yolo_model
+    runs_dir = config.get("yolo_runs_dir", DEFAULT_RUNS_DIR)
+    model_path = select_yolo_model(runs_dir=runs_dir)
     if not model_path or not os.path.exists(model_path):
         print(f"{RED}Error: Model file not found: {model_path}{RESET}")
         return False
@@ -329,7 +345,16 @@ def yolo_autolabel(config: Dict[str, Any], from_previous_step: bool = False) -> 
     delete_unlabeled = config.get("autolabel_delete_unlabeled", True)
     deleted_dir = config.get("autolabel_deleted_dir", "./deleted/unlabeled")
 
+    # Output directory for labeled images and labels
+    output_dir = config.get("autolabel_output_dir", "./autolabeled")
+    if video_name:
+        output_path = Path(output_dir) / video_name
+    else:
+        output_path = Path(output_dir)
+    output_dir = str(output_path)
+
     print(f"\nInput directory: {input_dir}")
+    print(f"Output directory: {output_dir}")
     print(f"Model: {model_path}")
     print(f"Confidence: {confidence}")
     print(f"IoU threshold: {iou_threshold}")
@@ -347,6 +372,7 @@ def yolo_autolabel(config: Dict[str, Any], from_previous_step: bool = False) -> 
             device=device,
             delete_unlabeled=delete_unlabeled,
             deleted_dir=deleted_dir,
+            output_dir=output_dir,
         )
 
         # Print summary
@@ -366,8 +392,9 @@ def yolo_autolabel(config: Dict[str, Any], from_previous_step: bool = False) -> 
 
         print("=" * 60)
 
-        # Update config for next step - labels are saved alongside images
-        config["labeling_input_dir"] = input_dir
+        # Update config for next step — point to output directory with labeled images
+        config["labeling_input_dir"] = output_dir
+        config["autolabel_output_result_dir"] = output_dir
 
         return True
 

@@ -140,6 +140,7 @@ Located in `Pipeline/workflow_config.json`. Controls frame extraction, filtering
 - `yolo_model_path`: Path to trained YOLO model (.pt or .onnx)
 - `autolabel_confidence`: Detection confidence threshold (default 0.25)
 - `autolabel_delete_unlabeled`: Remove images with no detections (default true)
+- `autolabel_output_dir`: Directory where labeled images and labels are copied to (default `./autolabeled`)
 - `yolo_train_ratio`: Train/val split ratio (default 0.8)
 
 ### YOLO Training Configuration
@@ -192,5 +193,6 @@ Each entry must include:
 
 **IMPORTANT:**
 - **Insertion point:** Always add new log entries directly below the `# Change Log` heading and `---` separator — above all existing date sections. If today's date section already exists at the top, append the new bullet points to that section (below its `## YYYY-MM-DD` heading) rather than creating a duplicate date heading.
+- **Git commit separators:** After committing to git, add a commit separator **above** the log entries that were included in that commit. Format: `**Git commit <short-hash>**...` followed by `---`. The separator goes between the `# Change Log` / `---` heading and the `## date` section, so it is clear which entries belong to which commit.
 - Never modify past log entries. Historical logs must remain unchanged to maintain an accurate project history.
 - **DO NOT FORGET to record changes to LOG.md immediately after making any code modifications.** This includes edits, file renames, deletions, and new files. Always update LOG.md before committing to git.
