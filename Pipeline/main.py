@@ -14,7 +14,7 @@ Steps:
 5. Consolidate dataset
 6. Convert to YOLO format
 7. Train YOLO model
-8. Video inference
+8. Inference (video / image / folder)
 
 Usage:
     python main.py
@@ -130,7 +130,7 @@ DEFAULT_CONFIG = {
     "train_amp": True,
     "train_augment": True,
 
-    # Step 7: Video inference
+    # Step 7: Inference
     "inference_conf": 0.25,
     "inference_iou": 0.45,
     "inference_imgsz": 640,
@@ -164,7 +164,7 @@ def print_step_menu():
     print("  4. Review/correct labels (X-AnyLabeling)")
     print("  5. Consolidate & convert to YOLO format")
     print("  6. Train YOLO model")
-    print("  7. Video inference")
+    print("  7. Inference (video / image / folder)")
     print()
     print("  0. Exit")
     print()
@@ -334,20 +334,20 @@ def train_yolo_model(config, **kwargs):
 
 
 def run_inference_step(config, **kwargs):
-    """Step 7: Run video inference using a trained YOLO model."""
+    """Step 7: Run inference using a trained YOLO model on video, image, or image folder."""
     print()
     print("=" * 60)
-    print("VIDEO INFERENCE")
+    print("INFERENCE")
     print("=" * 60)
 
-    # Prompt for video source (default to Step 1 video if available)
+    # Prompt for source (default to Step 1 video if available)
     default_source = config.get("video_path", "")
     print()
     if default_source:
         print(f"{YELLOW}Default video from Step 1: {default_source}{RESET}")
-        user_input = input(f"{GREEN}Press Enter to use default, or enter video path / camera index: {RESET}").strip()
+        user_input = input(f"{GREEN}Press Enter to use default, or enter video/image/folder path / camera index: {RESET}").strip()
     else:
-        user_input = input(f"{GREEN}Enter video path or camera index (e.g. 0 for webcam): {RESET}").strip()
+        user_input = input(f"{GREEN}Enter video/image/folder path or camera index (e.g. 0 for webcam): {RESET}").strip()
 
     source = user_input if user_input else default_source
     if not source:
@@ -484,7 +484,7 @@ def run_workflow(start_step: int, config: Dict[str, Any]) -> bool:
         (4, "Reviewing/correcting labels (X-AnyLabeling)", run_labeling),
         (5, "Consolidating & converting to YOLO format", consolidate_and_convert),
         (6, "Training YOLO model", train_yolo_model),
-        (7, "Running video inference", run_inference_step),
+        (7, "Running inference", run_inference_step),
     ]
 
     from_previous_step = False
@@ -645,7 +645,7 @@ Steps:
   4. Review/correct labels in X-AnyLabeling
   5. Consolidate & convert to YOLO format
   6. Train YOLO model
-  7. Video inference
+  7. Inference (video / image / folder)
         """
     )
 

@@ -4,6 +4,27 @@
 
 ## 2026-02-12
 
+- **Streamlined model export in training step**:
+  - Modified: `Pipeline/train.py` — Combined the separate ONNX and TensorRT export prompts into a single "Export model?" prompt. When a CUDA GPU is available, runs `export(format='engine')` which automatically produces both ONNX and TensorRT engine in one step. When no GPU is detected, falls back to ONNX-only export with explicit `format='onnx'` and `imgsz`. Removed the redundant standalone ONNX export that was running before the TensorRT export.
+
+- **Improved inference output naming and added image/folder support**:
+  - Modified: `Pipeline/inference.py` — Video outputs now saved as `<original_name>_labeled.mp4` next to the source (instead of `output_<timestamp>.mp4`). Added image inference support: single images and image folders are now valid `--source` inputs. Folder sources save annotated images to a sibling `<folder>_labeled/` directory. Single image sources also save to a `<parent_folder>_labeled/` directory. Added `_video_output_path()`, `_is_image()`, `_is_video()`, and `run_image_inference()` functions. Updated module docstring, argparse help/epilog, and CLI examples. Removed unused `os` import.
+  - Modified: `Pipeline/main.py` — Updated Step 7 title from "Video inference" to "Inference (video / image / folder)" across menu, step list, epilog, docstring, and progress display. Updated input prompt to mention image/folder sources.
+
+- **Auto-enable `--show` for webcam sources**:
+  - Modified: `Pipeline/inference.py` — When `--source` is a camera index (integer) and `--show` is not passed, `--show` is now auto-enabled with a yellow info message. Prevents useless batch-mode processing of a live webcam feed.
+
+- **Added TensorRT export after training**:
+  - Modified: `Pipeline/train.py` — After ONNX export, prompts user to also export to TensorRT `.engine` format (FP16). Only offered when a CUDA GPU is detected. Added `import torch` for GPU detection.
+
+- **Model selector prefers TensorRT engine by default**:
+  - Modified: `Pipeline/model_utils.py` — `find_yolo_versions()` now checks for `best.engine` before `best.pt`, so TensorRT models are used by default when available. Version listing now shows the format tag (`[engine]` / `[pt]`) next to each version. Custom path prompt updated to mention `.engine`.
+
+**Git commit 586e591** ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+---
+
+## 2026-02-12
+
 - **Integrated video inference into main.py as Step 7**:
   - Modified: `Pipeline/main.py` — imported `run_inference` from `inference.py`, added inference config defaults (`inference_conf`, `inference_iou`, `inference_imgsz`, `inference_show`, `inference_save`, `inference_device`, `inference_half`), added `run_inference_step()` wrapper that prompts for video source and model selection, updated all step numbering from 6 to 7 steps (menu, input validation, argparse choices, workflow loop, progress display, docstrings/epilog), wired `trained_model_path` from Step 6 training results so Step 7 defaults to the freshly trained model
   - Modified: `Pipeline/inference.py` — added `return True` at end of `run_inference()` so workflow can track success/failure; fixed `total_mem` → `total_memory` in `print_device_info()` for PyTorch 2.10+ compatibility

@@ -18,6 +18,8 @@ import subprocess
 from pathlib import Path
 from datetime import datetime
 
+import torch
+
 # Note: YOLO_VERBOSE=false was removed because it suppresses training progress output
 
 # ANSI color codes
@@ -383,20 +385,29 @@ def train_yolo(
     else:
         print("Skipping visualization.")
 
-    # Export to ONNX
+    # Export model
     print("\n" + "-" * 60)
-    run_export = input(f"{GREEN}Export model to ONNX format? [Y/n]: {RESET}").strip().lower()
+    run_export = input(f"{GREEN}Export model? [Y/n]: {RESET}").strip().lower()
 
     if run_export in ('', 'y', 'yes'):
         best_weights = Path(results.save_dir) / "weights" / "best.pt"
         if not best_weights.exists():
             best_weights = Path(results.save_dir) / "weights" / "last.pt"
 
-        print(f"{CYAN}Exporting {best_weights} to ONNX...{RESET}")
-        export_model = YOLO(str(best_weights))
-        export_model.export(format='onnx')
-        onnx_path = best_weights.with_suffix('.onnx')
-        print(f"{CYAN}ONNX model saved to: {onnx_path}{RESET}")
+        if torch.cuda.is_available():
+            # format=engine automatically exports ONNX first, then builds TensorRT engine
+            print(f"{CYAN}Exporting {best_weights} to ONNX + TensorRT engine (FP16)...{RESET}")
+            print(f"{YELLOW}This may take a few minutes. The engine is built for this specific GPU.{RESET}")
+            export_model = YOLO(str(best_weights))
+            export_model.export(format='engine', half=True, imgsz=imgsz)
+            print(f"{CYAN}ONNX model saved to: {best_weights.with_suffix('.onnx')}{RESET}")
+            print(f"{CYAN}TensorRT engine saved to: {best_weights.with_suffix('.engine')}{RESET}")
+        else:
+            print(f"{YELLOW}No CUDA GPU detected — exporting ONNX only.{RESET}")
+            print(f"{CYAN}Exporting {best_weights} to ONNX...{RESET}")
+            export_model = YOLO(str(best_weights))
+            export_model.export(format='onnx', imgsz=imgsz)
+            print(f"{CYAN}ONNX model saved to: {best_weights.with_suffix('.onnx')}{RESET}")
 
         # Generate X-AnyLabeling config
         import yaml

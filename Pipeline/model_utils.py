@@ -21,8 +21,10 @@ DEFAULT_RUNS_DIR = "/home/aidall/Object_Detection/runs/detect/runs"
 def find_yolo_versions(runs_dir: str = DEFAULT_RUNS_DIR) -> Dict[int, str]:
     """Find all YOLO_v* models in the runs directory.
 
+    Prefers best.engine (TensorRT) over best.pt when available.
+
     Returns:
-        Dict mapping version number -> path to best.pt
+        Dict mapping version number -> path to best model file
     """
     runs_path = Path(os.path.expanduser(runs_dir))
     if not runs_path.exists():
@@ -36,11 +38,18 @@ def find_yolo_versions(runs_dir: str = DEFAULT_RUNS_DIR) -> Dict[int, str]:
             v = int(d.name.split("YOLO_v")[1])
         except (ValueError, IndexError):
             continue
-        best_pt = d / "weights" / "best.pt"
-        if not best_pt.exists():
-            best_pt = d / "best.pt"
-        if best_pt.exists():
+
+        weights_dir = d / "weights"
+        # Prefer TensorRT engine > .pt
+        best_engine = weights_dir / "best.engine"
+        best_pt = weights_dir / "best.pt"
+
+        if best_engine.exists():
+            versions[v] = str(best_engine)
+        elif best_pt.exists():
             versions[v] = str(best_pt)
+        elif (d / "best.pt").exists():
+            versions[v] = str(d / "best.pt")
 
     return versions
 
@@ -70,7 +79,7 @@ def select_yolo_model(
         runs_path = Path(os.path.expanduser(runs_dir))
         print(f"\n{YELLOW}No YOLO versions found in {runs_path}{RESET}")
         if allow_custom_path:
-            custom = input(f"{GREEN}Enter path to model weights (.pt or .onnx): {RESET}").strip()
+            custom = input(f"{GREEN}Enter path to model weights (.engine / .pt / .onnx):{RESET}").strip()
             return custom if custom else None
         return None
 
@@ -81,7 +90,8 @@ def select_yolo_model(
     print(f"\nAvailable YOLO versions in {os.path.expanduser(runs_dir)}:")
     for v in sorted_versions:
         marker = " (latest)" if v == latest else ""
-        print(f"  YOLO_v{v}{marker}")
+        fmt = Path(versions[v]).suffix.lstrip('.')
+        print(f"  YOLO_v{v}{marker}  [{fmt}]")
     print()
 
     # Suggest the latest version
@@ -97,7 +107,7 @@ def select_yolo_model(
 
         if user_input.lower() == "c":
             if allow_custom_path:
-                custom = input(f"{GREEN}Enter path to model weights (.pt or .onnx): {RESET}").strip()
+                custom = input(f"{GREEN}Enter path to model weights (.engine / .pt / .onnx):{RESET}").strip()
                 return custom if custom else None
             continue
 
