@@ -41,7 +41,7 @@ def print_device_info(device):
         else:
             dev_idx = 0
         gpu_name = torch.cuda.get_device_name(dev_idx)
-        gpu_mem = torch.cuda.get_device_properties(dev_idx).total_mem / 1024**3
+        gpu_mem = torch.cuda.get_device_properties(dev_idx).total_memory / 1024**3
         print(f"Device: GPU — {gpu_name} ({gpu_mem:.1f} GB)")
     else:
         print("Device: CPU (no CUDA GPU detected)")
@@ -223,6 +223,7 @@ def run_inference(source, model_path, conf=0.25, iou=0.45, imgsz=640,
                   cap, width, height, video_fps, total_frames)
 
     cap.release()
+    return True
 
 
 def main():

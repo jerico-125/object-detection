@@ -4,6 +4,15 @@
 
 ## 2026-02-12
 
+- **Integrated video inference into main.py as Step 7**:
+  - Modified: `Pipeline/main.py` — imported `run_inference` from `inference.py`, added inference config defaults (`inference_conf`, `inference_iou`, `inference_imgsz`, `inference_show`, `inference_save`, `inference_device`, `inference_half`), added `run_inference_step()` wrapper that prompts for video source and model selection, updated all step numbering from 6 to 7 steps (menu, input validation, argparse choices, workflow loop, progress display, docstrings/epilog), wired `trained_model_path` from Step 6 training results so Step 7 defaults to the freshly trained model
+  - Modified: `Pipeline/inference.py` — added `return True` at end of `run_inference()` so workflow can track success/failure; fixed `total_mem` → `total_memory` in `print_device_info()` for PyTorch 2.10+ compatibility
+
+**Git commit 2250c43** ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+---
+
+## 2026-02-12
+
 - **Deleted unused `Pipeline/__init__.py`**:
   - Deleted: `Pipeline/__init__.py`
   - Nothing in the codebase imports from the `Pipeline` package — all scripts use direct imports (`from extract import ...`) since they run from within the Pipeline directory

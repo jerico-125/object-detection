@@ -14,6 +14,7 @@ Steps:
 5. Consolidate dataset
 6. Convert to YOLO format
 7. Train YOLO model
+8. Video inference
 
 Usage:
     python main.py
@@ -53,6 +54,9 @@ except ImportError as e:
     print(f"{RED}Warning: Could not import YOLO training module: {e}{RESET}")
     print(f"{RED}Make sure train.py is in the Pipeline directory{RESET}")
     train_yolo = None
+
+# Import inference
+from inference import run_inference
 
 
 # ============================================================================
@@ -125,6 +129,15 @@ DEFAULT_CONFIG = {
     "train_cache": False,
     "train_amp": True,
     "train_augment": True,
+
+    # Step 7: Video inference
+    "inference_conf": 0.25,
+    "inference_iou": 0.45,
+    "inference_imgsz": 640,
+    "inference_show": False,
+    "inference_save": True,
+    "inference_device": "",
+    "inference_half": False,
 }
 
 
@@ -151,6 +164,7 @@ def print_step_menu():
     print("  4. Review/correct labels (X-AnyLabeling)")
     print("  5. Consolidate & convert to YOLO format")
     print("  6. Train YOLO model")
+    print("  7. Video inference")
     print()
     print("  0. Exit")
     print()
@@ -160,13 +174,13 @@ def get_step_choice() -> int:
     """Get the user's step choice."""
     while True:
         try:
-            choice = input(f"{GREEN}Enter step number (1-6, or 0 to exit): {RESET}").strip()
+            choice = input(f"{GREEN}Enter step number (1-7, or 0 to exit): {RESET}").strip()
             if choice == "":
                 return 1
             choice = int(choice)
-            if 0 <= choice <= 6:
+            if 0 <= choice <= 7:
                 return choice
-            print("Please enter a number between 0 and 6.")
+            print("Please enter a number between 0 and 7.")
         except ValueError:
             print("Please enter a valid number.")
 
@@ -301,6 +315,10 @@ def train_yolo_model(config, **kwargs):
         if results:
             # Store training results path
             config["training_results_dir"] = str(results.save_dir)
+            # Store best model path for inference step
+            best_model = Path(results.save_dir) / "weights" / "best.pt"
+            if best_model.exists():
+                config["trained_model_path"] = str(best_model)
             print(f"\n{GREEN}Training completed successfully!{RESET}")
             print(f"Results saved to: {results.save_dir}")
             return True
@@ -313,6 +331,71 @@ def train_yolo_model(config, **kwargs):
         import traceback
         traceback.print_exc()
         return False
+
+
+def run_inference_step(config, **kwargs):
+    """Step 7: Run video inference using a trained YOLO model."""
+    print()
+    print("=" * 60)
+    print("VIDEO INFERENCE")
+    print("=" * 60)
+
+    # Prompt for video source (default to Step 1 video if available)
+    default_source = config.get("video_path", "")
+    print()
+    if default_source:
+        print(f"{YELLOW}Default video from Step 1: {default_source}{RESET}")
+        user_input = input(f"{GREEN}Press Enter to use default, or enter video path / camera index: {RESET}").strip()
+    else:
+        user_input = input(f"{GREEN}Enter video path or camera index (e.g. 0 for webcam): {RESET}").strip()
+
+    source = user_input if user_input else default_source
+    if not source:
+        print(f"{RED}Error: No video source specified.{RESET}")
+        return False
+
+    # Convert camera index if numeric
+    try:
+        source = int(source)
+    except ValueError:
+        pass
+
+    # Select model (default to freshly trained model from Step 6 if available)
+    from model_utils import select_yolo_model
+    runs_dir = config.get("yolo_runs_dir", "/home/aidall/Object_Detection/runs/detect/runs")
+
+    trained_model = config.get("trained_model_path")
+    if trained_model and Path(trained_model).exists():
+        print(f"\n{YELLOW}Trained model from Step 6: {trained_model}{RESET}")
+        use_trained = input(f"{GREEN}Use this model? (Y/n): {RESET}").strip().lower()
+        if use_trained != 'n':
+            model_path = trained_model
+        else:
+            model_path = select_yolo_model(runs_dir=runs_dir)
+    else:
+        print(f"\n{CYAN}Select model for inference:{RESET}")
+        model_path = select_yolo_model(runs_dir=runs_dir)
+
+    if not model_path:
+        print(f"{RED}Error: No model selected.{RESET}")
+        return False
+
+    print(f"\n{CYAN}Running inference...{RESET}")
+    print(f"{CYAN}{'-' * 60}{RESET}")
+
+    result = run_inference(
+        source=source,
+        model_path=model_path,
+        conf=config.get("inference_conf", 0.25),
+        iou=config.get("inference_iou", 0.45),
+        imgsz=config.get("inference_imgsz", 640),
+        show=config.get("inference_show", False),
+        save=config.get("inference_save", True),
+        device=config.get("inference_device", ""),
+        half=config.get("inference_half", False),
+    )
+
+    return bool(result)
 
 
 def print_progress(steps, current_step, start_step, status="running"):
@@ -363,6 +446,7 @@ def _get_step_output_dir(step_num, config):
         4: "labeling_input_dir",
         5: "consolidated_output_dir",
         6: "training_results_dir",
+        7: "",
     }
     key = mapping.get(step_num, "")
     return config.get(key, "")
@@ -400,6 +484,7 @@ def run_workflow(start_step: int, config: Dict[str, Any]) -> bool:
         (4, "Reviewing/correcting labels (X-AnyLabeling)", run_labeling),
         (5, "Consolidating & converting to YOLO format", consolidate_and_convert),
         (6, "Training YOLO model", train_yolo_model),
+        (7, "Running video inference", run_inference_step),
     ]
 
     from_previous_step = False
@@ -445,7 +530,7 @@ def run_workflow(start_step: int, config: Dict[str, Any]) -> bool:
             return False
         elif not success:
             print(f"\nStep {step_num} encountered an issue.")
-            if step_num < 6:
+            if step_num < 7:
                 next_step_name = steps[step_num][1]
                 continue_choice = input(f"{GREEN}Continue to Step {step_num + 1} - {next_step_name} anyway? (y/n): {RESET}").strip().lower()
                 if continue_choice != 'y':
@@ -460,7 +545,7 @@ def run_workflow(start_step: int, config: Dict[str, Any]) -> bool:
         elif skipped:
             # Step was skipped, move directly to next step without prompting
             from_previous_step = True
-        elif step_num < 6:
+        elif step_num < 7:
             next_step_name = steps[step_num][1]
             print()
             next_choice = input(f"{GREEN}Step {step_num} done. Continue to Step {step_num + 1} - {next_step_name}? (y/n): {RESET}").strip().lower()
@@ -471,7 +556,7 @@ def run_workflow(start_step: int, config: Dict[str, Any]) -> bool:
             from_previous_step = True
 
     # All steps complete
-    print_progress(steps, 6, start_step, "complete")
+    print_progress(steps, 7, start_step, "complete")
     print_summary(results, config)
     return True
 
@@ -560,11 +645,12 @@ Steps:
   4. Review/correct labels in X-AnyLabeling
   5. Consolidate & convert to YOLO format
   6. Train YOLO model
+  7. Video inference
         """
     )
 
-    parser.add_argument('--start-step', '-s', type=int, choices=[1, 2, 3, 4, 5, 6],
-                       help='Start from this step (1-6)')
+    parser.add_argument('--start-step', '-s', type=int, choices=[1, 2, 3, 4, 5, 6, 7],
+                       help='Start from this step (1-7)')
     parser.add_argument('--config', '-c', type=str,
                        help='Path to configuration JSON file')
     parser.add_argument('--generate-config', '-g', action='store_true',
