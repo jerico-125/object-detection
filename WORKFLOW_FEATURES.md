@@ -13,13 +13,15 @@ This document provides a comprehensive breakdown of features for each step in th
 - [Step 5: Consolidate + YOLO Conversion](#step-5-consolidate--yolo-conversion)
 - [Step 6: Train YOLO Model](#step-6-train-yolo-model)
 - [Alternative Step 6: Review Labels Viewer](#alternative-step-6-review-labels-viewer)
+- [Standalone Tools](#standalone-tools)
+- [Shared Utilities](#shared-utilities)
 - [General Features](#general-features)
 
 ---
 
 ## Step 1: Extract Frames
 
-**File:** `extract_frames.py`
+**File:** `extract.py`
 **Purpose:** Extract unique, sharp frames from videos or cluster existing images.
 
 ### Input Options
@@ -120,6 +122,13 @@ This document provides a comprehensive breakdown of features for each step in th
 **File:** `autolabel.py`
 **Purpose:** Automatically label images using a trained YOLO model and remove unlabeled images.
 
+### Model Selection
+
+- **Interactive selector:** Uses `model_utils.select_yolo_model()` to list available `YOLO_v*` versions from the runs directory
+- **Default suggestion:** Latest version (highest number)
+- **Custom path:** User can type `c` to enter a custom `.pt` or `.onnx` path
+- **Config key:** `yolo_runs_dir` sets the directory to scan (default: `/home/aidall/Object_Detection/runs/detect/runs`)
+
 ### Model Support
 
 - **PyTorch models:** `.pt` files
@@ -127,6 +136,14 @@ This document provides a comprehensive breakdown of features for each step in th
 - **Batch processing:**
   - `.pt` models: 500-image batches
   - `.onnx` models: Single-image batches (fixed batch size limitation)
+
+### Output Directory (Path Mirroring)
+
+- **Behavior:** Input path relative to `/home/aidall/Object_Detection` is mirrored under the output base directory
+- **Example:** Input `/home/aidall/Object_Detection/Set3/BoundingBox/Bbox_1_new` → Output `./autolabeled/Set3/BoundingBox/Bbox_1_new`
+- **Fallback:** If input is not under Object_Detection, uses just the folder name
+- **Labeled images and labels** are copied to the output directory; original input directory is untouched
+- **Config key:** `autolabel_output_dir` (default: `./autolabeled`)
 
 ### Auto-Deletion Feature
 
@@ -181,8 +198,9 @@ This document provides a comprehensive breakdown of features for each step in th
 
 ```json
 {
-  "yolo_model_path": "",
+  "yolo_runs_dir": "/home/aidall/Object_Detection/runs/detect/runs",
   "autolabel_input_dir": "./extracted_frames",
+  "autolabel_output_dir": "./autolabeled",
   "autolabel_confidence": 0.25,
   "autolabel_iou": 0.45,
   "autolabel_imgsz": 640,
@@ -232,6 +250,13 @@ If library not installed:
 - **Skip option:** User can skip anonymization and continue
   - Uses original images for next step
   - No anonymization applied
+
+### Return Values
+
+The function returns three distinct values for workflow integration:
+- **`True`**: Anonymization completed successfully
+- **`"skipped"`**: User chose to skip anonymization — workflow moves to next step without prompting "Continue to Step N?"
+- **`"stop"`**: User declined to skip — workflow stops immediately
 
 ### Subdirectory Handling
 
@@ -526,7 +551,7 @@ Label files saved to: ./Dataset/Label
    names: ['class1', 'class2', 'class3']
    ```
 7. **Removes intermediate folders:** `Image/` and `Label/`
-8. Outputs training command: `python train_yolo.py --data /path/to/dataset.yaml`
+8. Outputs training command: `python train.py --data /path/to/dataset.yaml`
 
 **Split method:**
 - Randomized with fixed seed (reproducible)
@@ -558,7 +583,7 @@ Label files saved to: ./Dataset/Label
 
 ## Step 6: Train YOLO Model
 
-**File:** `train_yolo.py` (imported from YOLO_Training/)
+**File:** `train.py` (imported from YOLO_Training/)
 **Purpose:** Train YOLOv8 object detection model using the converted YOLO dataset.
 
 ### Prerequisites
@@ -570,7 +595,21 @@ Label files saved to: ./Dataset/Label
   - `dataset.yaml` with class definitions
   - `classes.txt` with class names
 
-### Model Selection
+### Virtual Environment (Standalone Only)
+
+When running `train.py` directly (not via workflow):
+- **Auto-activation:** Detects and activates `yolo_env` venv at `/home/aidall/Object_Detection/yolo_env`
+- **Re-execution:** If not in the correct venv, re-executes the script with the venv's Python
+- **`--venv`:** Custom venv path
+- **`--no-venv`:** Skip venv activation
+- **`--setup-venv`:** Create venv and install `ultralytics` + `pillow` if missing
+
+### Model Selection (Interactive)
+
+**In workflow mode (Step 6):**
+- Uses `model_utils.select_yolo_model()` to list available `YOLO_v*` versions
+- User selects a base model (previous version's `best.pt` for fine-tuning, or custom path)
+- Falls back to `yolov8n.pt` if no selection made
 
 **Pre-trained models (YOLOv8):**
 - **yolov8n.pt** (Nano): Fastest, smallest, lowest accuracy
@@ -582,6 +621,12 @@ Label files saved to: ./Dataset/Label
 **Custom models:**
 - Path to previously trained `.pt` file
 - Resume training from checkpoint
+
+### Automatic Version Naming
+
+- **Scans** `yolo_runs_dir` for existing `YOLO_v*` folders
+- **Auto-increments**: If `YOLO_v3` is the latest, next run is named `YOLO_v4`
+- **Saves to**: `<yolo_runs_dir>/YOLO_v<N>/`
 
 ### Training Parameters
 
@@ -648,18 +693,18 @@ Label files saved to: ./Dataset/Label
 
 **Display before training:**
 ```
-==================================================
+============================================================
 YOLOv8 Training Configuration
-==================================================
+============================================================
   Model:      yolov8n.pt
   Dataset:    ./Dataset/dataset.yaml
   Epochs:     100
   Batch size: 16
   Image size: 640
   Device:     auto
-  Project:    ./runs
-  Name:       yolov8n_20260204_233000
-==================================================
+  Project:    /home/aidall/Object_Detection/runs/detect/runs
+  Name:       YOLO_v4
+============================================================
 ```
 
 **Live progress:**
@@ -742,11 +787,11 @@ classes:
 
 ### Output Structure
 
-**Results directory:** `./runs/<name>/`
+**Results directory:** `<yolo_runs_dir>/YOLO_v<N>/`
 
 ```
-runs/
-└── yolov8n_20260204_233000/
+runs/detect/runs/
+└── YOLO_v4/
     ├── weights/
     │   ├── best.pt              # Best model (by mAP)
     │   ├── last.pt              # Latest epoch
@@ -822,7 +867,7 @@ runs/
 
 ```json
 {
-  "train_model": "yolov8n.pt",
+  "yolo_runs_dir": "/home/aidall/Object_Detection/runs/detect/runs",
   "train_epochs": 100,
   "train_batch": 16,
   "train_imgsz": 640,
@@ -983,6 +1028,124 @@ Warning: 3 image(s) failed to load:
 
 ---
 
+## Standalone Tools
+
+### Video Inference
+
+**File:** `inference.py`
+**Purpose:** Run YOLO inference on video files with real-time display or batch processing.
+
+#### Two Modes
+
+| Mode | Flag | Description |
+|------|------|-------------|
+| **Batch** (default) | — | Processes video and saves annotated output. No display window. |
+| **Real-time** | `--show` | Opens an OpenCV window with live bounding boxes, FPS counter, and detection count. Press `q` to quit. |
+
+#### Features
+
+- **FPS overlay:** Smoothed FPS counter displayed on video (real-time mode)
+- **Detection count:** Per-frame detection count overlay
+- **Terminal progress:** `Frame 42/1000 (4%) | FPS: 30.2 | Detections: 5`
+- **Video info display:** Resolution, FPS, total frames, duration
+- **GPU info:** Device name and memory displayed at startup
+- **FP16 acceleration:** `--half` flag for faster GPU inference (Tensor Cores)
+- **Class filtering:** `--classes 0 2 5` to detect only specific class indices
+- **Webcam support:** `--source 0` for live camera input
+- **Stream support:** RTSP/HTTP stream URLs as source
+- **Save + display:** `--show --save` for both real-time viewing and saving
+
+#### Model Selection
+
+- **`--model`:** Specify a model path directly
+- **Default (no `--model`):** Uses `model_utils.select_yolo_model()` interactive selector
+
+#### Command-Line Arguments
+
+```bash
+python inference.py --source video.mp4                        # batch, latest YOLO_v*
+python inference.py --source video.mp4 --model best.pt        # specific model
+python inference.py --source video.mp4 --show                 # real-time
+python inference.py --source video.mp4 --show --save          # both
+python inference.py --source 0 --show                         # webcam
+python inference.py --source video.mp4 --half                 # FP16
+python inference.py --source video.mp4 --classes 0 2 5        # filter classes
+```
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `--source` | (required) | Video file, camera index, or stream URL |
+| `--model` | latest YOLO_v* | Path to YOLO model (.pt or .onnx) |
+| `--conf` | 0.25 | Confidence threshold |
+| `--iou` | 0.45 | IoU threshold for NMS |
+| `--imgsz` | 640 | Input image size |
+| `--show` | off | Real-time display mode |
+| `--save` | off | Save annotated video (always on in batch mode) |
+| `--device` | auto | CUDA device (`0`, `0,1`, `cpu`) |
+| `--classes` | all | Filter by class index |
+| `--half` | off | FP16 half-precision inference |
+
+---
+
+### Dataset Registry
+
+**File:** `dataset_registry.json` (project root)
+**Purpose:** Track which source sets compose each YOLO dataset version.
+
+#### Structure
+
+```json
+{
+  "description": "Registry tracking the composition of each YOLO dataset version.",
+  "datasets": {
+    "Dataset_YOLO_v1": {
+      "sources": ["Set1", "Set2"],
+      "notes": ""
+    },
+    "Dataset_YOLO_v2": {
+      "sources": ["Set3/Bbox_1"],
+      "notes": ""
+    }
+  }
+}
+```
+
+#### Fields
+
+- **`sources`:** Array of source set paths that were combined
+- **`notes`:** Optional free-text field for additional context
+
+---
+
+## Shared Utilities
+
+### model_utils.py
+
+**File:** `model_utils.py`
+**Purpose:** Shared YOLO model discovery and interactive selection. Used by `autolabel.py`, `inference.py`, and `main.py`.
+
+#### `find_yolo_versions(runs_dir)`
+
+- Scans `runs_dir` for `YOLO_v*` directories
+- Looks for `weights/best.pt` (or `best.pt` at root) inside each
+- Returns a dict mapping version number to model path
+
+#### `select_yolo_model(runs_dir, allow_custom_path)`
+
+- Lists all available `YOLO_v*` versions with `(latest)` marker
+- Suggests the highest version number as default
+- **User input options:**
+  - `Enter` — accept latest
+  - Version number — select specific version (with confirmation)
+  - `c` — enter a custom `.pt` or `.onnx` path
+- Returns the path to the selected model weights, or `None` if cancelled
+
+#### Default Runs Directory
+
+`/home/aidall/Object_Detection/runs/detect/runs`
+
+---
+
 ## General Features
 
 ### Features Present in All Steps
@@ -1021,19 +1184,32 @@ Enter output directory [default: ./Dataset]:
 
 **Behavior:** Press Enter to accept default
 
-#### 3. Red Warning Messages
+#### 3. Standardized Color Scheme
 
-**Requirement:** Per project guidelines in CLAUDE.md
+All pipeline files use consistent ANSI color codes:
 
-**ANSI code:** `\033[91m` (RED) with `\033[0m` (RESET)
+| Color | Code | Usage |
+|-------|------|-------|
+| **Green** (`\033[92m`) | `GREEN` | User input prompts (`input()` calls) |
+| **Red** (`\033[91m`) | `RED` | Errors and warnings |
+| **Yellow** (`\033[93m`) | `YELLOW` | Configuration info the user should review (parameters, paths, settings displayed before processing) |
+| **Cyan** (`\033[96m`) | `CYAN` | Processing/status info (system actions, summaries, results) |
+| **Reset** (`\033[0m`) | `RESET` | Reset to default terminal color |
 
 **Examples:**
-- `"ERROR: File not found"`
-- `"WARNING: Output directory already exists"`
-- `"CUDA not available - running on CPU"`
-- `"Failed to process label file"`
+- Green: `input(f"{GREEN}Enter directory [default: ...]: {RESET}")`
+- Red: `print(f"{RED}Error: File not found{RESET}")`
+- Yellow: `print(f"{YELLOW}Model: best.pt\nConfidence: 0.25{RESET}")`
+- Cyan: `print(f"{CYAN}Found 150 images{RESET}")`
 
-#### 4. From Previous Step Integration
+#### 4. Standardized Dividers
+
+| Divider | Usage |
+|---------|-------|
+| `"=" * 60` | Major section headers (banners, summaries, step titles) |
+| `"-" * 60` | Sub-sections (config details, minor separators) |
+
+#### 5. From Previous Step Integration
 
 **Parameter:** `from_previous_step: bool`
 
@@ -1050,7 +1226,7 @@ else:
 - Reduces user prompts
 - Maintains workflow state
 
-#### 5. Video Name Tracking
+#### 6. Video Name Tracking
 
 **Sources:**
 1. `config["video_name"]` (set by previous steps)
@@ -1061,7 +1237,7 @@ else:
 - Output folder organization
 - Consolidation naming
 
-#### 6. Deleted Files (Not Permanently Deleted)
+#### 7. Deleted Files (Not Permanently Deleted)
 
 **Locations:**
 - `./deleted/clustering/` (blurry/similar frames)
@@ -1070,7 +1246,7 @@ else:
 
 **Benefit:** Recoverable if needed, audit trail
 
-#### 7. Continue/Cancel Prompts on Failure
+#### 8. Continue/Cancel Prompts on Failure
 
 **Pattern:**
 ```python
@@ -1125,7 +1301,7 @@ if not success:
   ✓ Step 5: Consolidating & converting to YOLO format
       → ./Dataset
   ✓ Step 6: Training YOLO model
-      → ./runs/yolov8n_20260204_233000
+      → /home/aidall/Object_Detection/runs/detect/runs/YOLO_v4
 
   YOLO dataset: /path/to/Dataset/dataset.yaml
 ============================================================
@@ -1141,7 +1317,7 @@ if not success:
 
 ## Configuration File Structure
 
-### `yolo_workflow_config.json` (Complete Example)
+### `config.json` (Complete Example)
 
 ```json
 {
@@ -1158,8 +1334,9 @@ if not success:
   "clustering_eps": null,
   "clustering_min_samples": 2,
 
-  "yolo_model_path": "",
+  "yolo_runs_dir": "/home/aidall/Object_Detection/runs/detect/runs",
   "autolabel_input_dir": "./extracted_frames",
+  "autolabel_output_dir": "./autolabeled",
   "autolabel_confidence": 0.25,
   "autolabel_iou": 0.45,
   "autolabel_imgsz": 640,
@@ -1187,7 +1364,6 @@ if not success:
   "yolo_train_ratio": 0.8,
   "yolo_classes_file": null,
 
-  "train_model": "yolov8n.pt",
   "train_epochs": 100,
   "train_batch": 16,
   "train_imgsz": 640,
@@ -1214,19 +1390,19 @@ if not success:
 
 ```bash
 # Interactive mode (prompts for all inputs)
-python yolo_training_workflow.py
+python main.py
 
 # With video and model specified
-python yolo_training_workflow.py --video video.mp4 --model best.pt
+python main.py --video video.mp4 --model best.pt
 
 # Start from specific step (skip earlier steps)
-python yolo_training_workflow.py --start-step 3
+python main.py --start-step 3
 
 # Use custom config file
-python yolo_training_workflow.py --config my_config.json
+python main.py --config my_config.json
 
 # Generate template config
-python yolo_training_workflow.py --generate-config
+python main.py --generate-config
 ```
 
 ### Arguments
@@ -1249,8 +1425,8 @@ python yolo_training_workflow.py --generate-config
 1. `--config` argument path
 2. `./yolo_workflow_config.json`
 3. `<script_dir>/yolo_workflow_config.json`
-4. `./workflow_config.json`
-5. `<script_dir>/workflow_config.json`
+4. `./config.json`
+5. `<script_dir>/config.json`
 
 **Fallback:** Built-in defaults if no config found
 
@@ -1361,6 +1537,7 @@ Project/
 
 ## Version History
 
+- **v7.0** - Interactive model selector, video inference tool, dataset registry, UI color scheme standardization
 - **v6.0** - Added Step 6 (YOLO Training) to workflow
 - **v5.0** - Added YOLO training workflow
 - **v4.0** - Sequential clustering, parallel processing
@@ -1371,4 +1548,4 @@ Project/
 ---
 
 **Document created:** 2026-02-04
-**Last updated:** 2026-02-04 23:30 KST
+**Last updated:** 2026-02-12

@@ -855,6 +855,6 @@ names:
     print(f"  Removed: {label_dir}")
 
     print(f"\nYOLO dataset ready for training.")
-    print(f"Use with: python train_yolo.py --data {yaml_path}")
+    print(f"Use with: python train.py --data {yaml_path}")
 
     return True

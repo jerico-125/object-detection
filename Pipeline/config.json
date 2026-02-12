@@ -41,7 +41,7 @@
             "label_format": "Label format: 'json' (LabelMe), 'txt' (YOLO), 'xml' (Pascal VOC)"
         },
 
-        "YOLO Training Workflow (yolo_training_workflow.py)": {
+        "YOLO Training Workflow (main.py)": {
             "autolabel_input_dir": "Directory containing images to auto-label (typically extracted_frames)",
             "autolabel_confidence": "Confidence threshold for detections (0.0-1.0). Lower = more detections",
             "autolabel_iou": "IoU threshold for NMS (0.0-1.0). Lower = fewer overlapping boxes",
@@ -54,7 +54,7 @@
             "yolo_classes_file": "Path to classes.txt for YOLO conversion. null = auto-detect from JSON labels"
         },
 
-        "YOLO Training (yolo_training_workflow.py Step 6)": {
+        "YOLO Training (main.py Step 6)": {
             "train_epochs": "Number of training epochs. Default: 100",
             "train_batch": "Batch size (-1 for auto-batch). Default: 16",
             "train_imgsz": "Input image size (e.g., 640, 1280). Default: 640",

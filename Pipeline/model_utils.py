@@ -1,7 +1,7 @@
 """
 Shared YOLO model discovery and interactive selection utilities.
 
-Used by autolabel.py, video_inference.py, and yolo_training_workflow.py.
+Used by autolabel.py, inference.py, and main.py.
 """
 
 import os

@@ -3,9 +3,9 @@
 YOLOv8 Training Script
 
 Usage:
-    python train_yolo.py --data dataset.yaml --epochs 100
-    python train_yolo.py --data dataset.yaml --model yolov8m.pt --epochs 200 --batch 8
-    python train_yolo.py --data dataset.yaml --venv /path/to/yolo_env  # Auto-activate venv
+    python train.py --data dataset.yaml --epochs 100
+    python train.py --data dataset.yaml --model yolov8m.pt --epochs 200 --batch 8
+    python train.py --data dataset.yaml --venv /path/to/yolo_env  # Auto-activate venv
 
 Requirements:
     pip install ultralytics

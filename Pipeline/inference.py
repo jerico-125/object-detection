@@ -13,11 +13,11 @@ GPU acceleration:
   - Use --device to select a specific GPU (e.g. --device 0).
 
 Usage:
-    python video_inference.py --source video.mp4 --model best.pt              # batch (save)
-    python video_inference.py --source video.mp4 --model best.pt --show       # real-time display
-    python video_inference.py --source video.mp4 --model best.pt --show --save  # both
-    python video_inference.py --source 0 --model best.pt --show               # webcam
-    python video_inference.py --source video.mp4 --model best.pt --half       # FP16 acceleration
+    python inference.py --source video.mp4 --model best.pt              # batch (save)
+    python inference.py --source video.mp4 --model best.pt --show       # real-time display
+    python inference.py --source video.mp4 --model best.pt --show --save  # both
+    python inference.py --source 0 --model best.pt --show               # webcam
+    python inference.py --source video.mp4 --model best.pt --half       # FP16 acceleration
 """
 
 import argparse
@@ -238,13 +238,13 @@ GPU acceleration:
   YOLO uses GPU automatically if CUDA is available. Use --half for FP16 speed boost.
 
 Examples:
-  python video_inference.py --source video.mp4                              # uses latest YOLO_v*
-  python video_inference.py --source video.mp4 --model best.pt              # specific model
-  python video_inference.py --source video.mp4 --show                       # real-time
-  python video_inference.py --source video.mp4 --show --save                # real-time + save
-  python video_inference.py --source 0 --show                               # webcam
-  python video_inference.py --source video.mp4 --half                       # FP16 faster
-  python video_inference.py --source video.mp4 --classes 0 2 5
+  python inference.py --source video.mp4                              # uses latest YOLO_v*
+  python inference.py --source video.mp4 --model best.pt              # specific model
+  python inference.py --source video.mp4 --show                       # real-time
+  python inference.py --source video.mp4 --show --save                # real-time + save
+  python inference.py --source 0 --show                               # webcam
+  python inference.py --source video.mp4 --half                       # FP16 faster
+  python inference.py --source video.mp4 --classes 0 2 5
         """,
     )
 

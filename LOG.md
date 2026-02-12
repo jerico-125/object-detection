@@ -4,6 +4,52 @@
 
 ## 2026-02-12
 
+- **Deleted unused `Pipeline/__init__.py`**:
+  - Deleted: `Pipeline/__init__.py`
+  - Nothing in the codebase imports from the `Pipeline` package — all scripts use direct imports (`from extract import ...`) since they run from within the Pipeline directory
+  - The file was also entirely broken (all imports referenced old `stepX_` prefixed filenames that no longer exist)
+
+- **Renamed 5 Pipeline files for brevity**:
+  - Renamed: `extract_frames.py` → `extract.py`, `train_yolo.py` → `train.py`, `video_inference.py` → `inference.py`, `yolo_training_workflow.py` → `main.py`, `workflow_config.json` → `config.json`
+  - Modified: `Pipeline/main.py` — updated imports (`from extract import`, `from train import`), docstring usage examples, config file search paths, error messages
+  - Modified: `Pipeline/train.py` — updated docstring usage examples
+  - Modified: `Pipeline/inference.py` — updated docstring usage examples
+  - Modified: `Pipeline/model_utils.py` — updated docstring file references
+  - Modified: `Pipeline/consolidate.py` — updated training command hint
+  - Modified: `Pipeline/config.json` — updated documentation section headers
+  - Modified: `CLAUDE.md` — updated project structure tree, CLI examples, config reference
+  - Modified: `WORKFLOW_FEATURES.md` — updated all file references, CLI examples, config file discovery paths
+
+- **Slimmed down CLAUDE.md to eliminate overlap with WORKFLOW_FEATURES.md and workflow_config.json**:
+  - Modified: `CLAUDE.md`
+  - Removed the entire "Configuration Files" section (all config key listings for frame extraction, anonymization, labeling, YOLO auto-labeling, and YOLO training) — these are already self-documented in `workflow_config.json`'s `_documentation` section
+  - Removed the "Annotation Formats" section (covered in WORKFLOW_FEATURES.md)
+  - Consolidated the "Running the Pipeline" section — combined standard and YOLO workflow examples, removed duplicated step list
+  - Consolidated "Training (Standalone)" into a compact section
+  - Added reference link to WORKFLOW_FEATURES.md at the top
+  - Updated project structure tree to include `yolo_training_workflow.py`, `video_inference.py`, `model_utils.py`, and `WORKFLOW_FEATURES.md`
+  - Reduced file from 214 lines to 114 lines
+
+- **Updated WORKFLOW_FEATURES.md to reflect all changes since Feb 4**:
+  - Modified: `WORKFLOW_FEATURES.md`
+  - Step 2: Added model selection via `model_utils.select_yolo_model()`, output path mirroring behavior, `yolo_runs_dir` and `autolabel_output_dir` config keys
+  - Step 3: Documented new return values (`"skipped"`, `"stop"`) for workflow branching
+  - Step 6: Replaced `train_model` config key with interactive model selection, added auto version naming (`YOLO_v<N>`), added venv auto-activation docs
+  - New sections: Video Inference tool (`video_inference.py`), Dataset Registry (`dataset_registry.json`), Shared Utilities (`model_utils.py`)
+  - General Features: Replaced "Red Warning Messages" with full color scheme table (Green/Red/Yellow/Cyan) and divider standards
+  - Updated full config example: removed `yolo_model_path`/`train_model`, added `yolo_runs_dir`/`autolabel_output_dir`
+  - Updated version history to v7.0 and last-updated date
+
+- **Added dataset registry and documented it in CLAUDE.md**:
+  - New file: `dataset_registry.json`
+  - Modified: `CLAUDE.md`
+  - JSON file at the project root tracking which source sets compose each YOLO dataset version
+  - Added `dataset_registry.json` to the project structure tree and a "Dataset Registry" section in CLAUDE.md
+
+---
+**Git commit d4a40b3** ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+---
+
 - **Standardized terminal UI: consistent dividers and color-coded output**:
   - Modified: `Pipeline/train_yolo.py`, `Pipeline/yolo_training_workflow.py`, `Pipeline/extract_frames.py`, `Pipeline/autolabel.py`, `Pipeline/consolidate.py`, `Pipeline/anonymize.py`, `CLAUDE.md`
   - Added YELLOW and CYAN color constants to all pipeline files

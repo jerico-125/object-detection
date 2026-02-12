@@ -16,10 +16,10 @@ Steps:
 7. Train YOLO model
 
 Usage:
-    python yolo_training_workflow.py
-    python yolo_training_workflow.py --start-step 2
-    python yolo_training_workflow.py --config yolo_workflow_config.json
-    python yolo_training_workflow.py --video /path/to/video.mp4 --model /path/to/best.pt
+    python main.py
+    python main.py --start-step 2
+    python main.py --config config.json
+    python main.py --video /path/to/video.mp4 --model /path/to/best.pt
 """
 
 import os
@@ -40,7 +40,7 @@ CYAN = "\033[96m"
 RESET = "\033[0m"
 
 # Import step modules
-from extract_frames import extract_video_frames
+from extract import extract_video_frames
 from autolabel import yolo_autolabel
 from anonymize import anonymize_images
 from labeling import run_labeling
@@ -48,10 +48,10 @@ from consolidate import consolidate_files
 
 # Import YOLO training utilities
 try:
-    from train_yolo import train_yolo
+    from train import train_yolo
 except ImportError as e:
     print(f"{RED}Warning: Could not import YOLO training module: {e}{RESET}")
-    print(f"{RED}Make sure train_yolo.py is in the Pipeline directory{RESET}")
+    print(f"{RED}Make sure train.py is in the Pipeline directory{RESET}")
     train_yolo = None
 
 
@@ -208,7 +208,7 @@ def train_yolo_model(config, **kwargs):
     """Step 6: Train YOLO model using the converted dataset."""
     if train_yolo is None:
         print(f"{RED}Error: YOLO training module not available.{RESET}")
-        print(f"{RED}Make sure train_yolo.py is in the YOLO_Training directory.{RESET}")
+        print(f"{RED}Make sure train.py is in the Pipeline directory.{RESET}")
         return False
 
     print()
@@ -518,8 +518,8 @@ def find_default_config() -> Optional[str]:
     possible_configs = [
         Path("yolo_workflow_config.json"),
         script_dir / "yolo_workflow_config.json",
-        Path("workflow_config.json"),
-        script_dir / "workflow_config.json",
+        Path("config.json"),
+        script_dir / "config.json",
     ]
 
     for config_path in possible_configs:
@@ -539,19 +539,19 @@ def main():
         epilog="""
 Examples:
   # Run interactively
-  python yolo_training_workflow.py
+  python main.py
 
   # Start from a specific step
-  python yolo_training_workflow.py --start-step 2
+  python main.py --start-step 2
 
   # Use a specific configuration file
-  python yolo_training_workflow.py --config yolo_workflow_config.json
+  python main.py --config config.json
 
   # Specify video and model
-  python yolo_training_workflow.py --video /path/to/video.mp4 --model /path/to/best.pt
+  python main.py --video /path/to/video.mp4 --model /path/to/best.pt
 
   # Generate a template configuration file
-  python yolo_training_workflow.py --generate-config
+  python main.py --generate-config
 
 Steps:
   1. Extract image frames from video using ffmpeg
@@ -576,7 +576,7 @@ Steps:
 
     # Generate config template
     if args.generate_config:
-        config_path = "yolo_workflow_config.json"
+        config_path = "config.json"
         save_config(DEFAULT_CONFIG, config_path)
         print("Template configuration file generated. Edit it to customize your workflow.")
         return
@@ -593,7 +593,7 @@ Steps:
         if default_config_path:
             config_path = prompt_with_default("Enter config file path or press Enter to use default", default_config_path)
         else:
-            print("No default config file found (yolo_workflow_config.json)")
+            print("No default config file found (config.json)")
             config_path = input(f"{GREEN}Enter config file path (or press Enter to use built-in defaults): {RESET}").strip()
 
     # Load configuration
