@@ -22,6 +22,8 @@ from tqdm import tqdm
 # ANSI color codes
 GREEN = "\033[92m"
 RED = "\033[91m"
+YELLOW = "\033[93m"
+CYAN = "\033[96m"
 RESET = "\033[0m"
 
 
@@ -456,15 +458,15 @@ def extract_frames_from_single_video(
     actual_target_fps = fps / frame_interval
     expected_frames = int(duration * actual_target_fps) if duration > 0 else int(total_frames / frame_interval)
 
-    print(f"Video: {Path(video_path).name}")
+    print(f"{YELLOW}Video: {Path(video_path).name}")
     print(f"Resolution: {width}x{height}")
     print(f"FPS: {fps:.2f}")
     print(f"Duration: {duration:.2f} seconds")
     print(f"Total frames: {total_frames}")
     print(f"Frame interval: {frame_interval}")
     print(f"Similarity threshold: {threshold}")
-    print(f"Blur threshold: {blur_threshold} (frames below this are skipped)")
-    print("-" * 50)
+    print(f"Blur threshold: {blur_threshold} (frames below this are skipped){RESET}")
+    print("-" * 60)
 
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
@@ -588,14 +590,14 @@ def extract_frames_from_single_video(
 
     total_time = time.time() - start_time
 
-    print("-" * 50)
-    print(f"Completed!")
+    print("-" * 60)
+    print(f"{CYAN}Completed!")
     print(f"Processed: {processed_count} frames")
     print(f"Similar (skipped): {similar_count} frames")
     print(f"Blurry (skipped): {blurry_count} frames")
     print(f"Saved: {saved_count} unique frames")
     print(f"Output directory: {output_dir}")
-    print(f"Total time: {total_time:.2f}s")
+    print(f"Total time: {total_time:.2f}s{RESET}")
 
     return {
         'processed': processed_count,
@@ -662,14 +664,14 @@ def extract_frames_clustering(
     actual_target_fps = fps / frame_interval
     expected_frames = int(duration * actual_target_fps) if duration > 0 else int(total_frames / frame_interval)
 
-    print(f"Video: {Path(video_path).name}")
+    print(f"{YELLOW}Video: {Path(video_path).name}")
     print(f"Resolution: {width}x{height}")
     print(f"FPS: {fps:.2f}")
     print(f"Duration: {duration:.2f} seconds")
     print(f"Total frames: {total_frames}")
     print(f"Mode: DBSCAN Clustering (eps={eps:.4f}, min_samples={min_samples})")
-    print(f"Blur threshold: {blur_threshold}")
-    print("-" * 50)
+    print(f"Blur threshold: {blur_threshold}{RESET}")
+    print("-" * 60)
 
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
@@ -788,14 +790,14 @@ def extract_frames_clustering(
     total_time = time.time() - start_time
     similar_count = len(candidate_frames) - saved_count
 
-    print("-" * 50)
-    print(f"Completed!")
+    print("-" * 60)
+    print(f"{CYAN}Completed!")
     print(f"Processed: {processed_count} frames")
     print(f"Blurry (skipped): {blurry_count} frames")
     print(f"Clustered candidates: {len(candidate_frames)}")
     print(f"Saved: {saved_count} representative frames")
     print(f"Output directory: {output_dir}")
-    print(f"Total time: {total_time:.2f}s")
+    print(f"Total time: {total_time:.2f}s{RESET}")
 
     return {
         'processed': processed_count,
@@ -869,19 +871,19 @@ def cluster_image_directory(
             'saved': 0, 'moved': 0, 'time': 0, 'output_dir': output_dir
         }
 
-    print(f"Input directory: {input_dir}")
-    print(f"Found {len(image_files)} images")
+    print(f"{YELLOW}Input directory: {input_dir}")
+    print(f"Found {len(image_files)} images{RESET}")
 
     # Prompt user for clustering method if not specified
     if clustering_method is None:
         clustering_method = prompt_clustering_method()
 
     if clustering_method == "sequential":
-        print(f"Mode: Sequential Clustering (window={window_size}, eps={eps:.4f})")
+        print(f"{YELLOW}Mode: Sequential Clustering (window={window_size}, eps={eps:.4f})")
     else:
-        print(f"Mode: DBSCAN Clustering (eps={eps:.4f}, min_samples={min_samples})")
-    print(f"Blur threshold: {blur_threshold}")
-    print("-" * 50)
+        print(f"{YELLOW}Mode: DBSCAN Clustering (eps={eps:.4f}, min_samples={min_samples})")
+    print(f"Blur threshold: {blur_threshold}{RESET}")
+    print("-" * 60)
 
     # Group images by parent directory (cluster per-folder for efficiency)
     from collections import defaultdict
@@ -890,8 +892,8 @@ def cluster_image_directory(
         folder_groups[img_path.parent].append(img_path)
 
     n_folders = len(folder_groups)
-    print(f"Images spread across {n_folders} folder(s)")
-    print("-" * 50)
+    print(f"{CYAN}Images spread across {n_folders} folder(s){RESET}")
+    print("-" * 60)
 
     # Process each folder independently
     total_processed = 0
@@ -1002,7 +1004,7 @@ def cluster_image_directory(
 
     total_time = time.time() - start_time
 
-    print(f"\nCompleted!")
+    print(f"\n{CYAN}Completed!")
     print(f"Folders processed: {n_folders}")
     print(f"Processed: {total_processed} images")
     print(f"Blurry (moved to deleted): {total_blurry}")
@@ -1011,7 +1013,7 @@ def cluster_image_directory(
     print(f"Moved to deleted: {moved_count}")
     print(f"Output directory: {output_dir}")
     print(f"Deleted directory: {deleted_dir}")
-    print(f"Total time: {total_time:.2f}s")
+    print(f"Total time: {total_time:.2f}s{RESET}")
 
     return {
         'processed': total_processed,
@@ -1096,7 +1098,7 @@ def extract_video_frames(config: Dict[str, Any], from_previous_step: bool = Fals
 
             for idx, video_file in enumerate(video_files, 1):
                 print(f"\n{'=' * 60}")
-                print(f"Processing video {idx}/{len(video_files)}: {video_file.name}")
+                print(f"{CYAN}Processing video {idx}/{len(video_files)}: {video_file.name}{RESET}")
                 print("=" * 60)
 
                 video_name = video_file.stem
@@ -1126,12 +1128,12 @@ def extract_video_frames(config: Dict[str, Any], from_previous_step: bool = Fals
             print("\n" + "=" * 60)
             print("BATCH EXTRACTION SUMMARY")
             print("=" * 60)
-            print(f"Videos processed: {total_stats['videos_processed']}")
+            print(f"{CYAN}Videos processed: {total_stats['videos_processed']}")
             print(f"Videos failed: {total_stats['videos_failed']}")
             print(f"Total frames processed: {total_stats['total_processed']}")
             print(f"Total frames saved: {total_stats['total_saved']}")
             print(f"Total time: {total_stats['total_time']:.2f}s")
-            print(f"Output directory: {base_output_dir}")
+            print(f"Output directory: {base_output_dir}{RESET}")
 
             config["extracted_frames_dir"] = base_output_dir
             config["video_name"] = base_name

@@ -328,7 +328,7 @@ If venv not found:
 {
   "labeling_input_dir": "./anonymized_images",
   "anylabeling_venv": "x-anylabeling_env",
-  "anylabeling_repo": "~/AI_Hub/X-AnyLabeling",
+  "anylabeling_repo": "~/Object_Detection/X-AnyLabeling",
   "deleted_empty_labels_dir": "./deleted/empty_labels",
   "label_format": "json",
   "image_extensions": ["jpg", "jpeg", "png", "bmp", "tiff", "webp"]
@@ -1182,7 +1182,7 @@ if not success:
 
   "labeling_input_dir": "./anonymized_images",
   "anylabeling_venv": "x-anylabeling_env",
-  "anylabeling_repo": "~/AI_Hub/X-AnyLabeling",
+  "anylabeling_repo": "~/Object_Detection/X-AnyLabeling",
 
   "yolo_train_ratio": 0.8,
   "yolo_classes_file": null,

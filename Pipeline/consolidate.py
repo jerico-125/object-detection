@@ -16,6 +16,8 @@ from typing import Optional, Dict, Any
 # ANSI color codes
 GREEN = "\033[92m"
 RED = "\033[91m"
+YELLOW = "\033[93m"
+CYAN = "\033[96m"
 RESET = "\033[0m"
 
 
@@ -282,7 +284,7 @@ class ImageConsolidator:
             raise ValueError(f"Unsupported label format: {self.label_format}")
 
     def consolidate(self) -> None:
-        print(f"Scanning directory: {self.source_dir}")
+        print(f"{CYAN}Scanning directory: {self.source_dir}{RESET}")
         image_paths = self._find_all_images()
         self.total_images = len(image_paths)
 
@@ -290,17 +292,17 @@ class ImageConsolidator:
             print(f"No images found in {self.source_dir}")
             return
 
-        print(f"Found {self.total_images} images to consolidate")
+        print(f"{CYAN}Found {self.total_images} images to consolidate{RESET}")
         if self.include_labels:
             format_info = LABEL_FORMATS.get(self.label_format, {})
-            print(f"Label format: {format_info.get('name', self.label_format)}")
+            print(f"{CYAN}Label format: {format_info.get('name', self.label_format)}{RESET}")
 
         self.image_output_dir.mkdir(parents=True, exist_ok=True)
         if self.include_labels and self.separate_folders:
             self.label_output_dir.mkdir(parents=True, exist_ok=True)
-            print(f"Output: {self.output_dir} (Image/ and Label/ subfolders)")
+            print(f"{CYAN}Output: {self.output_dir} (Image/ and Label/ subfolders){RESET}")
         else:
-            print(f"Output directory: {self.output_dir}")
+            print(f"{CYAN}Output directory: {self.output_dir}{RESET}")
 
         start_index = self._get_starting_index()
 
@@ -368,7 +370,7 @@ class ImageConsolidator:
         print("\n" + "=" * 60)
         print("CONSOLIDATION SUMMARY")
         print("=" * 60)
-        print(f"Total images found: {self.total_images}")
+        print(f"{CYAN}Total images found: {self.total_images}")
         print(f"Successfully processed: {self.processed_images}")
         print(f"Failed: {self.failed_images}")
 
@@ -383,6 +385,7 @@ class ImageConsolidator:
             if self.include_labels and self.separate_folders:
                 print(f"Label files saved to: {self.label_output_dir}")
 
+        print(RESET, end="")
         print("=" * 60)
 
 
@@ -481,14 +484,14 @@ def consolidate_files(config: Dict[str, Any], from_previous_step: bool = False) 
         print()
         print("-" * 60)
         for i, d in enumerate(input_dirs, 1):
-            print(f"  1.{i} Input: {d}" if len(input_dirs) > 1 else f"  1. Input:  {d}")
-        print(f"  2. Output: {output_dir}")
+            print(f"{YELLOW}  1.{i} Input: {d}{RESET}" if len(input_dirs) > 1 else f"{YELLOW}  1. Input:  {d}{RESET}")
+        print(f"{YELLOW}  2. Output: {output_dir}{RESET}")
         if include_labels:
             label_display = LABEL_FORMATS[label_format]['name']
             if config.get("convert_to_yolo"):
                 label_display += " -> YOLO TXT (auto-converted)"
-            print(f"     Labels: {label_display}")
-        print(f"     Mode:   {'Copy' if copy_files else 'Move'}")
+            print(f"{YELLOW}     Labels: {label_display}{RESET}")
+        print(f"{YELLOW}     Mode:   {'Copy' if copy_files else 'Move'}{RESET}")
         print("-" * 60)
         prompt_options = "1=change input, 2=change output, 3=add input, Enter=proceed, q=cancel"
         choice = input(f"{GREEN}[{prompt_options}]: {RESET}").strip().lower()

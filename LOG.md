@@ -2,7 +2,75 @@
 
 ---
 
+## 2026-02-12
+
+- **Standardized terminal UI: consistent dividers and color-coded output**:
+  - Modified: `Pipeline/train_yolo.py`, `Pipeline/yolo_training_workflow.py`, `Pipeline/extract_frames.py`, `Pipeline/autolabel.py`, `Pipeline/consolidate.py`, `Pipeline/anonymize.py`, `CLAUDE.md`
+  - Added YELLOW and CYAN color constants to all pipeline files
+  - Yellow for configuration info (parameters, paths, settings the user should verify)
+  - Cyan for processing/status info (system actions, summaries, results)
+  - Green for user input prompts (added missing GREEN to `train_yolo.py` prompts)
+  - Standardized all dividers: `=` * 60 for major sections, `-` * 60 for sub-sections
+  - Removed `#` * 70 and `=` * 70 dividers from `yolo_training_workflow.py`
+  - Removed `-` * 50 dividers from `extract_frames.py` and `autolabel.py`
+  - Removed duplicate local CYAN/YELLOW definitions in `yolo_training_workflow.py` (now module-level)
+  - Updated CLAUDE.md UI Guidelines with full color scheme and divider rules
+
+- **Added UI guideline for green user prompts** in `CLAUDE.md`:
+  - Modified: `CLAUDE.md`
+  - Added rule that all `input()` prompts must use green text (`\033[92m`)
+
+- **Removed duplicate training configuration display** from `yolo_training_workflow.py`:
+  - Modified: `Pipeline/yolo_training_workflow.py`
+  - `train_yolo_model()` was printing training config (model, name, epochs, etc.) before calling `train_yolo()`, which prints the same information — removed the duplicate from the workflow
+
+- **Renamed project root from `AI_Hub` to `Object_Detection`** in all hardcoded paths:
+  - Modified: `Pipeline/model_utils.py`, `Pipeline/video_inference.py`, `Pipeline/train_yolo.py`, `Pipeline/autolabel.py`, `Pipeline/labeling.py`, `Pipeline/yolo_training_workflow.py`, `Pipeline/workflow_config.json`, `CLAUDE.md`, `WORKFLOW_FEATURES.md`
+  - Updated all `DEFAULT_RUNS_DIR`, `DEFAULT_VENV_PATH`, `anylabeling_repo`, `yolo_runs_dir` defaults and fallbacks
+  - Renamed `ai_hub_root` variable to `project_root` in `autolabel.py`
+  - Updated comments and help text referencing `AI_Hub`
+
+- **Created dataset registry file**:
+  - New file: `dataset_registry.json`
+  - JSON file at the project root that tracks the composition of each YOLO dataset version (which source sets were combined)
+  - Initial entries: `Dataset_YOLO_v1` (Set1 + Set2), `Dataset_YOLO_v2` (Set3/Bbox_1)
+
+## 2026-02-06
+
+- **Fixed duplicate prompt when skipping anonymization step**:
+  - Modified files: `Pipeline/anonymize.py`, `Pipeline/yolo_training_workflow.py`
+  - When user typed 'y' to skip anonymization, they were prompted again with "Step 3 done. Continue to Step 4?"
+  - Changed `anonymize.py` to return `"skipped"` instead of `True` when skipping, and `"stop"` instead of `False` when declining
+  - Updated `run_workflow()` in `yolo_training_workflow.py` to handle `"skipped"` (move to next step without prompting) and `"stop"` (end workflow immediately)
+  - Removed the "Please install anonymizer and try again." message when user declines to skip
+  - Rationale: Eliminates redundant prompt after skipping a step
+
+- **Autolabel output mirrors full input path relative to AI_Hub root**:
+  - Modified files: `Pipeline/autolabel.py`, `Pipeline/workflow_config.json`, `CLAUDE.md`
+  - Output path now preserves full directory structure relative to `/home/aidall/AI_Hub`
+  - Example: input `/home/aidall/AI_Hub/Set3/BoundingBox/Bbox_1_new` → output `./autolabeled/Set3/BoundingBox/Bbox_1_new`
+  - Falls back to just the folder name if input is not under AI_Hub
+  - Updated documentation in `workflow_config.json` and `CLAUDE.md`
+  - Rationale: Maintains full path context for organizing labeled datasets
+
+- **Changed autolabel to save labels only in output directory (not in-place)**:
+  - Modified file: `Pipeline/autolabel.py`
+  - Made `output_dir` a required parameter in `run_yolo_inference()` (moved from last position with default to third position, no default)
+  - Labels are now written directly to the output directory instead of being written in-place first and then copied
+  - Original input directory remains completely untouched — no JSON files are created there
+  - Updated docstring to reflect the new behavior
+  - Rationale: Prevents polluting the source image directory with label files
+
+**Git commit 86df169** ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+---
+
 ## 2026-02-05
+
+- **Autolabel output directory now derived from input directory**:
+  - Modified files: `Pipeline/autolabel.py`, `Pipeline/workflow_config.json`, `Pipeline/yolo_training_workflow.py`, `CLAUDE.md`
+  - Output dir is now a sibling `autolabeled/` folder next to the input dir's parent (e.g. `./extracted_frames/my_video` → `./autolabeled/my_video`)
+  - Removed `autolabel_output_dir` config option from `workflow_config.json`, `DEFAULT_CONFIG`, and `CLAUDE.md` — no longer needed since the path is computed from the input
+  - Rationale: Output naturally follows the input location instead of requiring a separate config key
 
 - **Autolabel now copies labeled images and labels into a separate output folder**:
   - Modified files: `Pipeline/autolabel.py`, `Pipeline/workflow_config.json`, `Pipeline/yolo_training_workflow.py`, `CLAUDE.md`

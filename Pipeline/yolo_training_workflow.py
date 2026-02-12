@@ -36,6 +36,7 @@ from typing import Optional, Dict, Any
 GREEN = "\033[92m"
 RED = "\033[91m"
 YELLOW = "\033[93m"
+CYAN = "\033[96m"
 RESET = "\033[0m"
 
 # Import step modules
@@ -101,14 +102,14 @@ DEFAULT_CONFIG = {
     # Step 5: Review/correct labels in X-AnyLabeling
     "labeling_input_dir": "./anonymized_images",
     "anylabeling_venv": "x-anylabeling_env",
-    "anylabeling_repo": "~/AI_Hub/X-AnyLabeling",
+    "anylabeling_repo": "~/Object_Detection/X-AnyLabeling",
 
     # Step 5 (final consolidation) -> YOLO conversion
     "yolo_train_ratio": 0.8,
     "yolo_classes_file": None,
 
     # Step 6: Train YOLO model
-    "yolo_runs_dir": "/home/aidall/AI_Hub/runs/detect/runs",
+    "yolo_runs_dir": "/home/aidall/Object_Detection/runs/detect/runs",
     "train_epochs": 100,
     "train_batch": 16,
     "train_imgsz": 640,
@@ -134,9 +135,9 @@ DEFAULT_CONFIG = {
 def print_banner():
     """Print the workflow banner."""
     print()
-    print("=" * 70)
-    print("            YOLO TRAINING WORKFLOW")
-    print("=" * 70)
+    print("=" * 60)
+    print("          YOLO TRAINING WORKFLOW")
+    print("=" * 60)
     print()
 
 
@@ -188,9 +189,9 @@ def consolidate_and_convert(config, **kwargs):
             stale_path.unlink()
 
     print()
-    print("#" * 70)
-    print("# CONSOLIDATING & CONVERTING TO YOLO FORMAT")
-    print("#" * 70)
+    print("=" * 60)
+    print("CONSOLIDATING & CONVERTING TO YOLO FORMAT")
+    print("=" * 60)
 
     result = consolidate_files(config, **kwargs)
 
@@ -211,9 +212,9 @@ def train_yolo_model(config, **kwargs):
         return False
 
     print()
-    print("#" * 70)
-    print("# TRAINING YOLO MODEL")
-    print("#" * 70)
+    print("=" * 60)
+    print("TRAINING YOLO MODEL")
+    print("=" * 60)
 
     # Get dataset.yaml path
     yaml_path = config.get("yolo_dataset_yaml")
@@ -253,25 +254,25 @@ def train_yolo_model(config, **kwargs):
         return False
 
     yaml_path = str(yaml_path_obj)
-    print(f"\nUsing dataset config: {yaml_path}")
+    print(f"\n{CYAN}Using dataset config: {yaml_path}{RESET}")
     print()
 
     # Determine version number and select base model
     from model_utils import find_yolo_versions, select_yolo_model
-    runs_dir = Path(os.path.expanduser(config.get("yolo_runs_dir", "/home/aidall/AI_Hub/runs/detect/runs")))
+    runs_dir = Path(os.path.expanduser(config.get("yolo_runs_dir", "/home/aidall/Object_Detection/runs/detect/runs")))
     versions = find_yolo_versions(str(runs_dir))
     latest_version = max(versions.keys()) if versions else 0
     version_num = latest_version + 1
     train_name = f"YOLO_v{version_num}"
 
     # Select base model (select_yolo_model lists available versions)
-    print(f"\nSelect base model for training:")
+    print(f"\n{CYAN}Select base model for training:{RESET}")
     train_model = select_yolo_model(runs_dir=str(runs_dir))
     if not train_model:
         train_model = "yolov8n.pt"
-        print(f"Using default model: {train_model}")
+        print(f"{CYAN}Using default model: {train_model}{RESET}")
 
-    print(f"\nNew training run: {train_name}")
+    print(f"\n{CYAN}New training run: {train_name}{RESET}")
 
     # Extract training parameters from config
     train_params = {
@@ -293,17 +294,6 @@ def train_yolo_model(config, **kwargs):
         "amp": config.get("train_amp", True),
         "augment": config.get("train_augment", True),
     }
-
-    # Show prompt before training
-    print(f"\n{YELLOW}Training configuration:{RESET}")
-    print(f"  Model:      {train_params['model']}")
-    print(f"  Name:       {train_name}")
-    print(f"  Save to:    {runs_dir / train_name}")
-    print(f"  Epochs:     {train_params['epochs']}")
-    print(f"  Batch size: {train_params['batch']}")
-    print(f"  Image size: {train_params['imgsz']}")
-    print(f"  Device:     {train_params['device'] if train_params['device'] else 'auto'}")
-    print()
 
     try:
         results = train_yolo(**train_params)
@@ -327,8 +317,6 @@ def train_yolo_model(config, **kwargs):
 
 def print_progress(steps, current_step, start_step, status="running"):
     """Print a progress block showing all steps and current status."""
-    CYAN = "\033[96m"
-    YELLOW = "\033[93m"
     DIM = "\033[2m"
     BOLD = "\033[1m"
     CHECK = f"{GREEN}\u2714{RESET}"
@@ -336,7 +324,7 @@ def print_progress(steps, current_step, start_step, status="running"):
     SKIP = f"{DIM}\u2500{RESET}"
     PENDING = f"{DIM}\u25cb{RESET}"
 
-    print(f"\n{CYAN}{'=' * 50}{RESET}")
+    print(f"\n{CYAN}{'=' * 60}{RESET}")
 
     for step_num, step_name, _ in steps:
         if step_num < start_step:
@@ -360,10 +348,10 @@ def print_progress(steps, current_step, start_step, status="running"):
         print(f"  {icon} {style}Step {step_num}: {step_name}{RESET if style else ''}")
 
     if status == "complete":
-        print(f"{CYAN}{'=' * 50}{RESET}")
+        print(f"{CYAN}{'=' * 60}{RESET}")
         print(f"{BOLD}{GREEN}  WORKFLOW COMPLETE!{RESET}")
     else:
-        print(f"{CYAN}{'=' * 50}{RESET}")
+        print(f"{CYAN}{'=' * 60}{RESET}")
 
 
 def _get_step_output_dir(step_num, config):
@@ -382,7 +370,6 @@ def _get_step_output_dir(step_num, config):
 
 def print_summary(results, config):
     """Print a final summary of all steps that were run."""
-    CYAN = "\033[96m"
     BOLD = "\033[1m"
 
     print()
@@ -430,7 +417,18 @@ def run_workflow(start_step: int, config: Dict[str, Any]) -> bool:
         if step_num > start_step:
             print_progress(steps, step_num, start_step, "running")
 
-        success = step_func(config, from_previous_step=from_previous_step)
+        result = step_func(config, from_previous_step=from_previous_step)
+
+        # Normalize result: True/False/"skipped"/"stop"
+        if result == "skipped":
+            success = True
+            skipped = True
+        elif result == "stop":
+            success = False
+            skipped = False
+        else:
+            success = bool(result)
+            skipped = False
 
         # Record result for summary
         results.append({
@@ -440,7 +438,12 @@ def run_workflow(start_step: int, config: Dict[str, Any]) -> bool:
             "output_dir": _get_step_output_dir(step_num, config),
         })
 
-        if not success:
+        if result == "stop":
+            # User explicitly chose to stop
+            print("\nWorkflow stopped.")
+            print_summary(results, config)
+            return False
+        elif not success:
             print(f"\nStep {step_num} encountered an issue.")
             if step_num < 6:
                 next_step_name = steps[step_num][1]
@@ -454,6 +457,9 @@ def run_workflow(start_step: int, config: Dict[str, Any]) -> bool:
                 print("\nWorkflow stopped.")
                 print_summary(results, config)
                 return False
+        elif skipped:
+            # Step was skipped, move directly to next step without prompting
+            from_previous_step = True
         elif step_num < 6:
             next_step_name = steps[step_num][1]
             print()

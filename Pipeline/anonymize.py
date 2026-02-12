@@ -13,6 +13,7 @@ from typing import Dict, Any
 # ANSI color codes
 GREEN = "\033[92m"
 RED = "\033[91m"
+CYAN = "\033[96m"
 RESET = "\033[0m"
 
 
@@ -185,9 +186,9 @@ def anonymize_images(config: Dict[str, Any], from_previous_step: bool = False) -
             )
 
             print()
-            print("-" * 50)
-            print("Anonymization complete!")
-            print(f"Output directory: {output_dir}")
+            print("-" * 60)
+            print(f"{CYAN}Anonymization complete!")
+            print(f"Output directory: {output_dir}{RESET}")
 
             # Update config for next step
             config["labeling_input_dir"] = output_dir
@@ -229,7 +230,6 @@ def anonymize_images(config: Dict[str, Any], from_previous_step: bool = False) -
         if skip_choice == 'y':
             # Use input_dir as output for next step
             config["labeling_input_dir"] = input_dir
-            return True
+            return "skipped"
         else:
-            print("\nPlease install anonymizer and try again.")
-            return False
+            return "stop"

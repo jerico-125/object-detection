@@ -30,7 +30,7 @@ import torch
 from ultralytics import YOLO
 
 # Default directory for YOLO version runs
-DEFAULT_RUNS_DIR = "/home/aidall/AI_Hub/runs/detect/runs"
+DEFAULT_RUNS_DIR = "/home/aidall/Object_Detection/runs/detect/runs"
 
 
 def print_device_info(device):

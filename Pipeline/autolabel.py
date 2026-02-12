@@ -21,10 +21,12 @@ from tqdm import tqdm
 # ANSI color codes
 GREEN = "\033[92m"
 RED = "\033[91m"
+YELLOW = "\033[93m"
+CYAN = "\033[96m"
 RESET = "\033[0m"
 
 # Default directory for YOLO version runs
-DEFAULT_RUNS_DIR = "/home/aidall/AI_Hub/runs/detect/runs"
+DEFAULT_RUNS_DIR = "/home/aidall/Object_Detection/runs/detect/runs"
 
 
 # ============================================================================
@@ -141,30 +143,31 @@ def create_labelme_json(image_path: Path, image_shape: tuple, detections: list) 
 def run_yolo_inference(
     model_path: str,
     input_dir: str,
+    output_dir: str,
     confidence: float = 0.25,
     iou_threshold: float = 0.45,
     imgsz: int = 640,
     device: str = "",
     delete_unlabeled: bool = True,
     deleted_dir: str = "./deleted/unlabeled",
-    output_dir: str = "",
 ) -> dict:
     """
     Run YOLO model on all images in a directory, save JSON labels,
     and optionally move images with no detections to deleted directory.
 
-    Labeled images and their JSON labels are copied to output_dir if provided.
+    Labeled images and their JSON labels are saved to output_dir only.
+    Original input directory remains untouched.
 
     Args:
         model_path: Path to YOLO model weights (.pt or .onnx)
         input_dir: Directory containing images to label
+        output_dir: Directory to save labeled images and labels into
         confidence: Confidence threshold for detections
         iou_threshold: IoU threshold for NMS
         imgsz: Input image size for inference
         device: CUDA device or 'cpu'
         delete_unlabeled: If True, move images without detections to deleted_dir
         deleted_dir: Directory to move unlabeled images to
-        output_dir: Directory to copy labeled images and labels into (if empty, labels saved in-place)
 
     Returns:
         Dictionary with statistics
@@ -173,6 +176,7 @@ def run_yolo_inference(
 
     model = YOLO(model_path)
     input_path = Path(input_dir)
+    output_path = Path(output_dir)
 
     image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.webp'}
     image_files = sorted([
@@ -184,17 +188,14 @@ def run_yolo_inference(
         print(f"No images found in {input_dir}")
         return {'total': 0, 'labeled': 0, 'unlabeled': 0, 'deleted': 0, 'total_detections': 0}
 
-    # Create output directory for labeled images if specified
-    output_path = Path(output_dir) if output_dir else None
-    if output_path:
-        output_path.mkdir(parents=True, exist_ok=True)
+    # Create output directory for labeled images
+    output_path.mkdir(parents=True, exist_ok=True)
 
-    print(f"\nFound {len(image_files)} images")
-    if output_path:
-        print(f"Copy labeled to: {output_path}")
-    print(f"Move unlabeled to: {deleted_dir}")
+    print(f"\n{CYAN}Found {len(image_files)} images")
+    print(f"Output directory: {output_path}")
+    print(f"Move unlabeled to: {deleted_dir}{RESET}")
     Path(deleted_dir).mkdir(parents=True, exist_ok=True)
-    print("-" * 50)
+    print("-" * 60)
 
     stats = {
         'total': len(image_files),
@@ -261,21 +262,26 @@ def run_yolo_inference(
             stats['labeled'] += 1
             stats['total_detections'] += len(detections)
 
-            # Save JSON label file alongside the image
+            # Create label data
             label_data = create_labelme_json(
                 image_path=image_path,
                 image_shape=result.orig_shape,
                 detections=detections
             )
 
-            label_path = image_path.with_suffix('.json')
+            # Save image and label to output directory only (preserving subdirectory structure)
+            rel = image_path.relative_to(input_path)
+            dest_dir = output_path / rel.parent
+            dest_dir.mkdir(parents=True, exist_ok=True)
+
+            # Copy image to output
+            dest_image_path = dest_dir / image_path.name
+            shutil.copy2(str(image_path), str(dest_image_path))
+
+            # Save label in output directory
+            label_path = dest_image_path.with_suffix('.json')
             with open(label_path, 'w', encoding='utf-8') as f:
                 json.dump(label_data, f, indent=2, ensure_ascii=False)
-
-            # Copy labeled image and label to output directory
-            if output_path:
-                shutil.copy2(str(image_path), str(output_path / image_path.name))
-                shutil.copy2(str(label_path), str(output_path / label_path.name))
 
             pbar.update(1)
 
@@ -346,49 +352,55 @@ def yolo_autolabel(config: Dict[str, Any], from_previous_step: bool = False) -> 
     deleted_dir = config.get("autolabel_deleted_dir", "./deleted/unlabeled")
 
     # Output directory for labeled images and labels
-    output_dir = config.get("autolabel_output_dir", "./autolabeled")
-    if video_name:
-        output_path = Path(output_dir) / video_name
-    else:
-        output_path = Path(output_dir)
-    output_dir = str(output_path)
+    # Mirror input path relative to Object_Detection root
+    # e.g. /home/aidall/Object_Detection/Set3/BoundingBox/Bbox_1_new → ./autolabeled/Set3/BoundingBox/Bbox_1_new
+    output_base = config.get("autolabel_output_dir", "./autolabeled")
+    project_root = Path("/home/aidall/Object_Detection")
+    input_path_obj = Path(input_dir).resolve()
+    try:
+        rel_path = input_path_obj.relative_to(project_root)
+    except ValueError:
+        # Input is not under Object_Detection, fall back to just the folder name
+        rel_path = input_path_obj.name
+    output_dir = str(Path(output_base) / rel_path)
 
-    print(f"\nInput directory: {input_dir}")
+    print(f"\n{YELLOW}Input directory: {input_dir}")
     print(f"Output directory: {output_dir}")
     print(f"Model: {model_path}")
     print(f"Confidence: {confidence}")
     print(f"IoU threshold: {iou_threshold}")
     print(f"Image size: {imgsz}")
-    print(f"Delete unlabeled: {delete_unlabeled}")
+    print(f"Delete unlabeled: {delete_unlabeled}{RESET}")
     print()
 
     try:
         stats = run_yolo_inference(
             model_path=model_path,
             input_dir=input_dir,
+            output_dir=output_dir,
             confidence=confidence,
             iou_threshold=iou_threshold,
             imgsz=imgsz,
             device=device,
             delete_unlabeled=delete_unlabeled,
             deleted_dir=deleted_dir,
-            output_dir=output_dir,
         )
 
         # Print summary
         print("\n" + "=" * 60)
         print("AUTO-LABELING SUMMARY")
         print("=" * 60)
-        print(f"Total images processed: {stats['total']}")
+        print(f"{CYAN}Total images processed: {stats['total']}")
         print(f"Images with detections: {stats['labeled']}")
         print(f"Images without detections: {stats['unlabeled']}")
         print(f"Images removed: {stats['deleted']}")
-        print(f"Total detections: {stats['total_detections']}")
+        print(f"Total detections: {stats['total_detections']}{RESET}")
 
         if stats['class_counts']:
-            print("\nDetections per class:")
+            print(f"\n{CYAN}Detections per class:")
             for cls_name, count in sorted(stats['class_counts'].items()):
                 print(f"  {cls_name}: {count}")
+            print(RESET, end="")
 
         print("=" * 60)
 

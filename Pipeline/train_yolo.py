@@ -20,8 +20,14 @@ from datetime import datetime
 
 # Note: YOLO_VERBOSE=false was removed because it suppresses training progress output
 
+# ANSI color codes
+GREEN = "\033[92m"
+YELLOW = "\033[93m"
+CYAN = "\033[96m"
+RESET = "\033[0m"
+
 # Default virtual environment path
-DEFAULT_VENV_PATH = "/home/aidall/AI_Hub/yolo_env"
+DEFAULT_VENV_PATH = "/home/aidall/Object_Detection/yolo_env"
 
 
 def activate_venv(venv_path: str) -> bool:
@@ -217,14 +223,14 @@ def train_yolo(
     print("=" * 60)
     print("YOLOv8 Training Configuration")
     print("=" * 60)
-    print(f"  Model:      {model}")
+    print(f"{YELLOW}  Model:      {model}")
     print(f"  Dataset:    {data}")
     print(f"  Epochs:     {epochs}")
     print(f"  Batch size: {batch}")
     print(f"  Image size: {imgsz}")
     print(f"  Device:     {device if device else 'auto'}")
     print(f"  Project:    {project}")
-    print(f"  Name:       {name}")
+    print(f"  Name:       {name}{RESET}")
     print("=" * 60)
 
     # Load model
@@ -287,22 +293,22 @@ def train_yolo(
         })
 
     # Start training
-    print("\nStarting training...")
+    print(f"\n{CYAN}Starting training...{RESET}")
     results = yolo.train(**train_args)
 
     # Print results
     print("\n" + "=" * 60)
     print("Training Complete!")
     print("=" * 60)
-    print(f"Results saved to: {results.save_dir}")
+    print(f"{CYAN}Results saved to: {results.save_dir}{RESET}")
 
     # Prompt user for sample visualization
     print("\n" + "-" * 60)
-    run_vis = input("Run sample visualization on validation images? [Y/n]: ").strip().lower()
+    run_vis = input(f"{GREEN}Run sample visualization on validation images? [Y/n]: {RESET}").strip().lower()
 
     if run_vis in ('', 'y', 'yes'):
-        samples_input = input(f"Number of samples [{visualize_samples}]: ").strip()
-        conf_input = input(f"Confidence threshold [{vis_conf}]: ").strip()
+        samples_input = input(f"{GREEN}Number of samples [{visualize_samples}]: {RESET}").strip()
+        conf_input = input(f"{GREEN}Confidence threshold [{vis_conf}]: {RESET}").strip()
 
         num_samples = int(samples_input) if samples_input else visualize_samples
         conf_threshold = float(conf_input) if conf_input else vis_conf
@@ -311,7 +317,7 @@ def train_yolo(
         import yaml
         import cv2
 
-        print(f"\nVisualizing {num_samples} sample predictions (conf={conf_threshold})...")
+        print(f"\n{CYAN}Visualizing {num_samples} sample predictions (conf={conf_threshold})...{RESET}")
 
         # Load best weights
         best_weights = Path(results.save_dir) / "weights" / "best.pt"
@@ -373,24 +379,24 @@ def train_yolo(
                 print(f"  [{i+1}/{num_samples}] {img_file.name}: "
                       f"{num_det} detections - {', '.join(det_summary) if det_summary else 'none'}")
 
-        print(f"\nSample predictions saved to: {vis_dir}")
+        print(f"\n{CYAN}Sample predictions saved to: {vis_dir}{RESET}")
     else:
         print("Skipping visualization.")
 
     # Export to ONNX
     print("\n" + "-" * 60)
-    run_export = input("Export model to ONNX format? [Y/n]: ").strip().lower()
+    run_export = input(f"{GREEN}Export model to ONNX format? [Y/n]: {RESET}").strip().lower()
 
     if run_export in ('', 'y', 'yes'):
         best_weights = Path(results.save_dir) / "weights" / "best.pt"
         if not best_weights.exists():
             best_weights = Path(results.save_dir) / "weights" / "last.pt"
 
-        print(f"Exporting {best_weights} to ONNX...")
+        print(f"{CYAN}Exporting {best_weights} to ONNX...{RESET}")
         export_model = YOLO(str(best_weights))
         export_model.export(format='onnx')
         onnx_path = best_weights.with_suffix('.onnx')
-        print(f"ONNX model saved to: {onnx_path}")
+        print(f"{CYAN}ONNX model saved to: {onnx_path}{RESET}")
 
         # Generate X-AnyLabeling config
         import yaml
@@ -419,7 +425,7 @@ def train_yolo(
         }
         with open(config_path, 'w') as f:
             yaml.dump(config_content, f, default_flow_style=False, sort_keys=False)
-        print(f"X-AnyLabeling config saved to: {config_path}")
+        print(f"{CYAN}X-AnyLabeling config saved to: {config_path}{RESET}")
     else:
         print("Skipping ONNX export.")
 

@@ -15,7 +15,7 @@ YELLOW = "\033[93m"
 RESET = "\033[0m"
 
 # Default directory for YOLO version runs
-DEFAULT_RUNS_DIR = "/home/aidall/AI_Hub/runs/detect/runs"
+DEFAULT_RUNS_DIR = "/home/aidall/Object_Detection/runs/detect/runs"
 
 
 def find_yolo_versions(runs_dir: str = DEFAULT_RUNS_DIR) -> Dict[int, str]:

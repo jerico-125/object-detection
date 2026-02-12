@@ -49,7 +49,7 @@
             "autolabel_device": "CUDA device (e.g., '0', '0,1', 'cpu'). Empty string = auto",
             "autolabel_delete_unlabeled": "true = remove images with no detections, false = keep all",
             "autolabel_deleted_dir": "Directory where unlabeled images are moved. Default: ./deleted/unlabeled",
-            "autolabel_output_dir": "Directory where labeled images and labels are copied to. Default: ./autolabeled",
+            "autolabel_output_dir": "Base directory for labeled output. Input path relative to /home/aidall/Object_Detection is appended (e.g. ./autolabeled + Set3/BoundingBox/Bbox_1 → ./autolabeled/Set3/BoundingBox/Bbox_1). Default: ./autolabeled",
             "yolo_train_ratio": "Train/val split ratio for YOLO conversion (0.0-1.0). Default: 0.8",
             "yolo_classes_file": "Path to classes.txt for YOLO conversion. null = auto-detect from JSON labels"
         },
@@ -98,7 +98,7 @@
 
     "labeling_input_dir": "./anonymized_images",
     "anylabeling_venv": "x-anylabeling_env",
-    "anylabeling_repo": "~/AI_Hub/X-AnyLabeling",
+    "anylabeling_repo": "~/Object_Detection/X-AnyLabeling",
     "deleted_empty_labels_dir": "./deleted/empty_labels",
 
     "consolidated_output_dir": "./Dataset",

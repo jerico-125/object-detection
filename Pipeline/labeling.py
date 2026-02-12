@@ -256,7 +256,7 @@ def run_labeling(config: Dict[str, Any], from_previous_step: bool = False) -> bo
 
         # Build the command to activate venv and run anylabeling
         activate_script = os.path.join(venv_path, "bin", "activate")
-        repo_path = os.path.expanduser(config.get("anylabeling_repo", "~/AI_Hub/X-AnyLabeling"))
+        repo_path = os.path.expanduser(config.get("anylabeling_repo", "~/Object_Detection/X-AnyLabeling"))
         cmd = (
             f'source "{activate_script}" && '
             f'PYTHONPATH="{repo_path}:$PYTHONPATH" python -m anylabeling.app'
