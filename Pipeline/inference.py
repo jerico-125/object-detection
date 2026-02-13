@@ -1,7 +1,7 @@
 """
 Standalone YOLO Inference
 
-Supports video files, image files, and image folders.
+Supports video files, image files, image folders, and video folders.
 
 Video modes:
   1. Real-time mode (--show): Opens a window with live bounding boxes, FPS counter,
@@ -13,6 +13,8 @@ Image/folder mode:
   - Single image: Runs inference and saves the annotated image.
   - Folder of images: Processes all images and saves annotated copies to a
     sibling folder named <source_folder>_labeled/.
+  - Folder of videos: Processes each video sequentially, saving
+    <name>_labeled.mp4 next to each source video.
 
 Output naming:
   - Video: <original_name>_labeled.mp4 (saved next to the source video)
@@ -128,7 +130,8 @@ def run_realtime(model, conf, iou, imgsz, device, classes, save, half,
             print(f"\rFrame {frame_count} | FPS: {fps_smoothed:.1f} | "
                   f"Detections: {det_count}", end="", flush=True)
 
-        if cv2.waitKey(1) & 0xFF == ord("q"):
+        key = cv2.waitKey(1) & 0xFF
+        if key == ord("q") or cv2.getWindowProperty("YOLO Inference", cv2.WND_PROP_VISIBLE) < 1:
             print("\nStopped by user.")
             break
 
@@ -208,6 +211,61 @@ def _is_image(path):
 def _is_video(path):
     """Check if a path points to a video file."""
     return Path(path).suffix.lower() in VIDEO_EXTENSIONS
+
+
+def run_video_folder_inference(model, source, conf, iou, imgsz, device, classes,
+                               half, show, save):
+    """Run inference on a folder of video files.
+
+    Processes each video in the folder sequentially using the standard
+    video inference pipeline (batch or real-time mode).
+    """
+    source_path = Path(source)
+    videos = sorted(
+        p for p in source_path.iterdir()
+        if p.suffix.lower() in VIDEO_EXTENSIONS
+    )
+    if not videos:
+        print(f"\033[91mError: No video files found in {source}\033[0m")
+        return False
+
+    print(f"Mode: Video folder inference")
+    print(f"Found {len(videos)} videos in: {source}\n")
+
+    for i, vid_path in enumerate(videos, 1):
+        print(f"\n{'=' * 60}")
+        print(f"[{i}/{len(videos)}] Processing: {vid_path.name}")
+        print(f"{'=' * 60}")
+
+        cap = cv2.VideoCapture(str(vid_path))
+        if not cap.isOpened():
+            print(f"\033[91mError: Could not open video: {vid_path}\033[0m")
+            continue
+
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        video_fps = cap.get(cv2.CAP_PROP_FPS) or 30
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+
+        print(f"Resolution: {width}x{height} | Video FPS: {video_fps:.1f}", end="")
+        if total_frames > 0:
+            duration = total_frames / video_fps
+            print(f" | Total frames: {total_frames} ({duration:.1f}s)")
+        else:
+            print()
+
+        if show:
+            run_realtime(model, conf, iou, imgsz, device, classes, save or not show, half,
+                         cap, width, height, video_fps, total_frames, str(vid_path))
+        else:
+            run_batch(model, conf, iou, imgsz, device, classes, half,
+                      cap, width, height, video_fps, total_frames, str(vid_path))
+
+        cap.release()
+
+    print(f"\n{'=' * 60}")
+    print(f"\033[96mDone. Processed {len(videos)} videos.\033[0m")
+    return True
 
 
 def run_image_inference(model, source, conf, iou, imgsz, device, classes, half):
@@ -303,9 +361,30 @@ def run_inference(source, model_path, conf=0.25, iou=0.45, imgsz=640,
     print(f"Confidence: {conf} | IoU: {iou} | Image size: {imgsz}"
           f"{' | FP16: on' if half else ''}")
 
-    # Detect source type: image file, image folder, or video/stream
-    if isinstance(source, str) and (Path(source).is_dir() or _is_image(source)):
+    # Detect source type: image file, image/video folder, or video/stream
+    if isinstance(source, str) and Path(source).is_dir():
+        # Check what the folder contains
+        has_videos = any(p.suffix.lower() in VIDEO_EXTENSIONS for p in Path(source).iterdir())
+        has_images = any(p.suffix.lower() in IMAGE_EXTENSIONS for p in Path(source).iterdir())
+        if has_videos:
+            return run_video_folder_inference(model, source, conf, iou, imgsz, device,
+                                             classes, half, show, save)
+        elif has_images:
+            return run_image_inference(model, source, conf, iou, imgsz, device, classes, half)
+        else:
+            print(f"\033[91mError: No image or video files found in {source}\033[0m")
+            return False
+    if isinstance(source, str) and _is_image(source):
         return run_image_inference(model, source, conf, iou, imgsz, device, classes, half)
+
+    # Webcam: auto-enable show, ask about saving
+    is_webcam = isinstance(source, int)
+    if is_webcam:
+        if not show:
+            print("\033[93mWebcam source detected — enabling real-time display.\033[0m")
+            show = True
+        save_input = input("\033[92mSave webcam recording? [y/N]: \033[0m").strip().lower()
+        save = save_input in ('y', 'yes')
 
     # Video / stream / webcam
     cap = cv2.VideoCapture(source)
@@ -360,6 +439,7 @@ Examples:
   python inference.py --source video.mp4 --classes 0 2 5
   python inference.py --source image.jpg --model best.pt              # single image
   python inference.py --source images/ --model best.pt                # image folder
+  python inference.py --source videos/ --model best.pt                # video folder
         """,
     )
 
@@ -401,19 +481,13 @@ Examples:
     except ValueError:
         source = args.source
 
-    # Auto-enable --show for webcam sources
-    show = args.show
-    if isinstance(source, int) and not show:
-        print("\033[93mWebcam source detected — enabling real-time display (--show).\033[0m")
-        show = True
-
     run_inference(
         source=source,
         model_path=model_path,
         conf=args.conf,
         iou=args.iou,
         imgsz=args.imgsz,
-        show=show,
+        show=args.show,
         save=args.save,
         device=args.device,
         classes=args.classes,

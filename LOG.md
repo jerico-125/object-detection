@@ -2,6 +2,20 @@
 
 ---
 
+## 2026-02-14
+
+- **Fix: closing OpenCV window now stops inference**:
+  - Modified: `Pipeline/inference.py` — Added `cv2.getWindowProperty()` check in the real-time loop so clicking the X button on the window properly stops inference, instead of the window reopening on the next frame. Previously only the 'q' key worked to quit.
+
+- **Webcam: prompt user to save before streaming**:
+  - Modified: `Pipeline/inference.py` — Webcam now prompts "Save webcam recording? [y/N]" before starting the stream instead of silently deciding based on `--save`. Consolidated all webcam logic into `run_inference()` and removed the duplicate handling from `main()`.
+
+- **Added video folder inference support**:
+  - Modified: `Pipeline/inference.py` — When `--source` is a directory containing video files, inference now processes each video sequentially instead of erroring with "No image files found". Added `run_video_folder_inference()` function that iterates over all video files in the folder, running the standard batch or real-time pipeline on each. Updated the source-type routing in `run_inference()` to check for video files before images when source is a directory. Also shows a clear error if the folder contains neither images nor videos. Updated module docstring and CLI examples.
+
+**Git commit 3d3d99d** ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+---
+
 ## 2026-02-12
 
 - **Streamlined model export in training step**:
@@ -11,8 +25,8 @@
   - Modified: `Pipeline/inference.py` — Video outputs now saved as `<original_name>_labeled.mp4` next to the source (instead of `output_<timestamp>.mp4`). Added image inference support: single images and image folders are now valid `--source` inputs. Folder sources save annotated images to a sibling `<folder>_labeled/` directory. Single image sources also save to a `<parent_folder>_labeled/` directory. Added `_video_output_path()`, `_is_image()`, `_is_video()`, and `run_image_inference()` functions. Updated module docstring, argparse help/epilog, and CLI examples. Removed unused `os` import.
   - Modified: `Pipeline/main.py` — Updated Step 7 title from "Video inference" to "Inference (video / image / folder)" across menu, step list, epilog, docstring, and progress display. Updated input prompt to mention image/folder sources.
 
-- **Auto-enable `--show` for webcam sources**:
-  - Modified: `Pipeline/inference.py` — When `--source` is a camera index (integer) and `--show` is not passed, `--show` is now auto-enabled with a yellow info message. Prevents useless batch-mode processing of a live webcam feed.
+- **Webcam behavior: auto-show, no-save-by-default**:
+  - Modified: `Pipeline/inference.py` — When source is a webcam (integer), `--show` is auto-enabled and saving is disabled by default. Saving only happens if `--save` is explicitly passed. This logic applies both in the CLI (`main()`) and in `run_inference()` itself (so main.py callers also get correct behavior). Added info messages for webcam auto-show and recording-enabled states.
 
 - **Added TensorRT export after training**:
   - Modified: `Pipeline/train.py` — After ONNX export, prompts user to also export to TensorRT `.engine` format (FP16). Only offered when a CUDA GPU is detected. Added `import torch` for GPU detection.
